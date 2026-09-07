@@ -1,0 +1,303 @@
+/* ============================================================
+   charts.js — ECharts / DOM 图表封装（Task 9）
+   面板渲染地基：panels/*.js 只调 Charts.*，颜色序列/字体/tooltip/
+   grid 全部在此统一（取自设计文档 §6），涨跌语义色（正=红、负=蓝，
+   债市惯例净买入/净供给为正）由封装内部约定，调用方不传色。
+
+   对外 API（echarts 类返回实例；空数据返回 null 并渲染 .empty 占位）：
+     Charts.line(el, {series:[{name,dates,values}], yUnit, range})
+        通用折线；dates 为 ISO 串，x 轴 time；range 切换条
+        1Y/3Y/5Y/全部（默认 3Y，从各序列最后一个日期倒推日历天数裁剪）；
+        缺口（null）断线如实呈现（connectNulls=false）；图例可点选隐藏；
+        series 可带 dashed:true（虚线 1.4）/ step:true（阶梯 end）——政策利率
+        锚线用（v5-T2），其余调用方不带标志行为不变
+     Charts.seasonal(el, {years, byYear, yUnit, xLabels})
+        季节性多年对比：当年（years 最大值）蓝粗线，历史年灰阶细线；
+        byYear 为 {年: values[]} 或与 years 对齐的数组；xLabels 缺省 1..N
+     Charts.barDiverge(el, {dates, values, yUnit})
+        正负柱（净供给/净买入）：正=红、负=蓝；tooltip 带符号；
+        >120 根自动抽样（始终保留最后一根）+ barMaxWidth
+     Charts.bar(el, {dates, values, yUnit})
+        单序列柱（水平量，如余额）：单色蓝（区别于 barDiverge 的正负语义色）；
+        抽样/barMaxWidth 同 barDiverge；单序列无图例（卡标题即名）
+     Charts.heat(el, {rows, cols, values, fmt, title})
+        DOM 热力图（机构×期限净买入）：红买蓝卖双色发散，色标按本矩阵
+        max|v| 对称；0=白、null 格=浅灰+"无数据" tooltip；格子内嵌数值，
+        超 120 格改纯色 + 仅 hover（title）显示；返回 table 元素
+     Charts.sparkline(el, values, {width=90, height=28})
+        表格迷你线：无轴无 tooltip，蓝线 + 淡渐变面积
+     Charts.table(el, {columns, rows, onRowClick})
+        统一表格（.tbl）：数字列（number 或数字串）加 .num 右对齐、
+        null/undefined/"" 显示 "—"；onRowClick(row, idx) 行点击；
+        返回 tbody 行元素数组便于调用方追加高亮逻辑
+     Charts.custom(el, opt)
+        预组装 option 直挂（生命周期同上；axis/grid/series 调用方全权定制）
+   ============================================================ */
+const PANELS = {};  // 全局面板注册表：panels/*.js 填充，app.js 消费（需先于面板加载）
+
+/* —— §6 视觉常量（封装内部使用）—— */
+const FONT = "-apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,\"Helvetica Neue\",Arial,\"PingFang SC\",\"Microsoft YaHei\",sans-serif";
+const C_BLUE = "#1769aa", C_BLUE_DK = "#0b4f87", C_RED = "#c24135",
+      C_TEXT = "#425466", C_STRONG = "#0a2540", C_MUTED = "#587086",
+      C_LINE = "#d8e2eb", C_LINE_SOFT = "#e8eef4";
+/* 多序列调色板：ColorBrewer Dark2 为主的可区分 14 色（首色保留站内蓝——单线图
+   视觉不变）；seasonal 灰阶+当年高亮、热力红蓝、正负柱语义色不受影响 */
+const SERIES_COLORS = ["#1769aa", "#d95f02", "#1b9e77", "#7570b3", "#e7298a", "#66a61e",
+      "#e6ab02", "#a6761d", "#66c2a5", "#fc8d62", "#8da0cb", "#b3b3b3", "#e41a1c", "#6a3d9a"];
+
+/* echarts 实例注册表：调用方 el → 实例。同一 el 重复调用先 dispose；
+   window resize 统一分发（模块级一次性监听），el 已脱离 DOM 则顺手清理 */
+const _charts = new Map();
+window.addEventListener("resize", () => {
+  for (const [el, c] of _charts) {
+    if (!el.isConnected) { c.dispose(); _charts.delete(el); }
+    else c.resize();
+  }
+});
+
+function _dispose(el) { const c = _charts.get(el); if (c) { c.dispose(); _charts.delete(el); } }
+function _mount(el, opt, box) {           // box 缺省即 el 本身（line 因含切换条用内层 box）
+  if (_charts.get(el)) _dispose(el);      // 同 el 重调先 dispose：init 对已有实例的 DOM 返回旧实例，不弃则旧序列 merge 残留/画布空白
+  const c = echarts.init(box || el);
+  c.setOption(opt);
+  _charts.set(el, c);
+  return c;
+}
+function _empty(el) { _dispose(el); el.innerHTML = ""; el.append(h("div", {class: "empty"}, ["暂无数据"])); return null; }
+function _hasData(values) { return (values || []).some(v => v !== null && v !== undefined && v !== "" && !Number.isNaN(Number(v))); }
+function _fmt2(v) { return (typeof App !== "undefined" && App.fmt) ? App.fmt(v, 2) : (v == null ? "—" : Number(v).toFixed(2)); }
+
+/* 公共 option 工厂：白底 tooltip（§6 阴影、12px）、grid containLabel、多序列可区分色板 */
+function _tip(extra) {
+  return Object.assign({
+    backgroundColor: "#ffffff", borderWidth: 1, borderColor: C_LINE_SOFT, padding: [6, 10],
+    textStyle: {color: C_TEXT, fontSize: 12, fontFamily: FONT},
+    extraCssText: "box-shadow:0 2px 5px rgba(50,50,93,.045),0 10px 24px rgba(10,37,64,.04);",
+  }, extra);
+}
+function _base() {
+  return {
+    color: SERIES_COLORS,
+    textStyle: {fontFamily: FONT, color: C_TEXT},
+    tooltip: _tip({trigger: "axis"}),
+    grid: {left: 8, right: 18, top: 34, bottom: 2, containLabel: true},
+  };
+}
+const _axisX = (extra) => Object.assign({axisLine: {lineStyle: {color: C_LINE}}, axisTick: {show: false},
+  axisLabel: {color: C_MUTED, hideOverlap: true}, splitLine: {show: false}}, extra);
+const _axisY = (yUnit) => ({type: "value", name: yUnit, scale: true, nameTextStyle: {color: C_MUTED},
+  axisLabel: {color: C_MUTED}, splitLine: {lineStyle: {color: C_LINE_SOFT}}});
+
+/* 按锚点日期倒推 days 天裁剪，返回 [date, value] 对；anchorTs 为全局锚（各序列
+   末日期的最大值）时停更序列与新鲜序列共用同一近端窗口，缺省回退自身末日期 */
+function _clipPairs(dates, values, days, anchorTs) {
+  let lastTs = Number.isFinite(anchorTs) ? anchorTs : -Infinity;
+  for (const d of dates) { const t = new Date(d).getTime(); if (!Number.isNaN(t) && t > lastTs) lastTs = t; }
+  const cut = Number.isFinite(days) && lastTs > -Infinity ? lastTs - days * 864e5 : -Infinity;
+  return dates.map((d, i) => {
+    const t = new Date(d).getTime();
+    return (Number.isNaN(t) || t >= cut) ? [d, values[i] === undefined ? null : values[i]] : null;
+  }).filter(Boolean);
+}
+
+const Charts = {
+
+  line(el, {series = [], yUnit = "", range = "3Y"} = {}) {
+    if (!series.length || !series.some(s => _hasData(s.values))) return _empty(el);
+    const RANGES = {"1Y": 365, "3Y": 1095, "5Y": 1825, "ALL": Infinity};
+    if (!(range in RANGES)) range = "3Y";
+    _dispose(el);
+    el.innerHTML = "";
+    const tabs = h("div", {class: "tabs"}, Object.keys(RANGES).map(r =>
+      h("button", {class: "tab" + (r === range ? " active" : ""), "data-r": r, onclick: () => draw(r)},
+        [r === "ALL" ? "全部" : r])));
+    const box = h("div", {style: {width: "100%", height: "calc(100% - 46px)", minHeight: "200px"}});
+    el.append(tabs, box);
+    const chart = _mount(el, {}, box);
+    let anchorTs = -Infinity;                            // 全局锚点：多序列最大末日期（停更序列 1Y 窗不漂移）
+    series.forEach((s) => { const d = (s.dates || [])[(s.dates || []).length - 1];
+      const t = d === undefined ? NaN : new Date(d).getTime(); if (!Number.isNaN(t) && t > anchorTs) anchorTs = t; });
+    function draw(r) {
+      tabs.querySelectorAll(".tab").forEach(b => b.classList.toggle("active", b.dataset.r === r));
+      chart.setOption(Object.assign(_base(), {
+        tooltip: _tip({trigger: "axis", valueFormatter: v => v == null ? "—" : _fmt2(v) + (yUnit ? " " + yUnit : "")}),
+        legend: {top: 0, icon: "roundRect", itemWidth: 14, itemHeight: 4, textStyle: {color: C_TEXT}},
+        xAxis: _axisX({type: "time"}),
+        yAxis: _axisY(yUnit),
+        series: series.map(s => ({name: s.name, type: "line", showSymbol: false, connectNulls: false,
+          lineStyle: {width: s.dashed ? 1.4 : 1.6, type: s.dashed ? "dashed" : "solid"},
+          step: s.step ? "end" : false,
+          emphasis: {focus: "series"}, data: _clipPairs(s.dates || [], s.values || [], RANGES[r], anchorTs)})),
+      }), {notMerge: true});
+      chart.resize();
+    }
+    draw(range);
+    return chart;
+  },
+
+  seasonal(el, {years = [], byYear = {}, yUnit = "", xLabels} = {}) {
+    const map = Array.isArray(byYear)
+      ? Object.fromEntries(years.map((y, i) => [String(y), byYear[i] || []]))
+      : Object.fromEntries(Object.entries(byYear).map(([k, v]) => [String(k), v]));
+    const ys = years.map(String).filter(y => (map[y] || []).length);
+    if (!ys.length || !ys.some(y => _hasData(map[y]))) return _empty(el);
+    ys.sort((a, b) => Number(a) - Number(b));
+    const cur = ys[ys.length - 1];                       // 当年 = 最大年
+    const hist = ys.slice(0, -1);
+    const gray = (i) => {                                // 历史年灰阶：越近越深
+      const t = hist.length <= 1 ? 0 : i / (hist.length - 1);
+      return "rgb(" + [178, 187, 197].map((x, k) => Math.round(x + ([112, 130, 145][k] - x) * t)).join(",") + ")";
+    };
+    const n = Math.max(...ys.map(y => map[y].length));
+    const labels = (xLabels && xLabels.length) ? xLabels : Array.from({length: n}, (_, i) => i + 1);
+    return _mount(el, Object.assign(_base(), {
+      tooltip: _tip({trigger: "axis", valueFormatter: v => v == null ? "—" : _fmt2(v) + (yUnit ? " " + yUnit : "")}),
+      legend: {top: 0, icon: "roundRect", itemWidth: 14, itemHeight: 4, textStyle: {color: C_TEXT}},
+      xAxis: _axisX({type: "category", data: labels, boundaryGap: false}),
+      yAxis: _axisY(yUnit),
+      series: ys.map(y => {
+        const isCur = y === cur, g = gray(hist.indexOf(y));
+        return {name: y, type: "line", showSymbol: false, connectNulls: false,
+          itemStyle: {color: isCur ? C_BLUE : g}, lineStyle: {width: isCur ? 2.5 : 1.1, color: isCur ? C_BLUE : g},
+          emphasis: {focus: "series"}, data: map[y].map(x => x === undefined ? null : x)};
+      }),
+    }));
+  },
+
+  barDiverge(el, {dates = [], values = [], yUnit = ""} = {}) {
+    if (!dates.length || !_hasData(values)) return _empty(el);
+    let d = dates, v = values;
+    if (dates.length > 120) {                            // 柱过密自动抽样（保留最后一根）
+      const stride = Math.ceil(dates.length / 120);
+      const idx = dates.map((_, i) => i).filter(i => i % stride === 0 || i === dates.length - 1);
+      d = idx.map(i => dates[i]);
+      v = idx.map(i => values[i]);
+    }
+    return _mount(el, Object.assign(_base(), {
+      grid: {left: 8, right: 18, top: 30, bottom: 2, containLabel: true},
+      tooltip: _tip({trigger: "axis", valueFormatter: x => x == null ? "—" : (x >= 0 ? "+" : "") + _fmt2(x) + (yUnit ? " " + yUnit : "")}),
+      xAxis: _axisX({type: "category", data: d}),
+      yAxis: _axisY(yUnit),
+      series: [{type: "bar", barMaxWidth: 18,
+        itemStyle: {color: p => (p.value >= 0 ? C_RED : C_BLUE), borderRadius: 1},
+        data: v.map(x => x === undefined ? null : x)}],
+    }));
+  },
+
+  bar(el, {dates = [], values = [], yUnit = ""} = {}) {
+    if (!dates.length || !_hasData(values)) return _empty(el);
+    let d = dates, v = values;
+    if (dates.length > 120) {                            // 柱过密自动抽样（保留最后一根），同 barDiverge
+      const stride = Math.ceil(dates.length / 120);
+      const idx = dates.map((_, i) => i).filter(i => i % stride === 0 || i === dates.length - 1);
+      d = idx.map(i => dates[i]);
+      v = idx.map(i => values[i]);
+    }
+    return _mount(el, Object.assign(_base(), {
+      grid: {left: 8, right: 18, top: 30, bottom: 2, containLabel: true},
+      tooltip: _tip({trigger: "axis", valueFormatter: x => x == null ? "—" : _fmt2(x) + (yUnit ? " " + yUnit : "")}),
+      xAxis: _axisX({type: "category", data: d}),
+      yAxis: _axisY(yUnit),
+      series: [{type: "bar", barMaxWidth: 18,             // 单序列水平量柱：单色（区别于 barDiverge 的正负语义色）
+        itemStyle: {color: C_BLUE, borderRadius: 1},
+        data: v.map(x => x === undefined ? null : x)}],
+    }));
+  },
+
+  heat(el, {rows = [], cols = [], values = [], fmt, title = ""} = {}) {
+    const F = fmt || _fmt2;
+    _dispose(el);                           // DOM 实现：清掉 el 上可能残留的旧 echarts 实例（跨 API 换挂）
+    el.innerHTML = "";
+    if (!rows.length || !cols.length || !values.length) { el.append(h("div", {class: "empty"}, ["暂无数据"])); return null; }
+    let maxAbs = 0;                                      // 色标按本矩阵绝对值对称
+    values.forEach(r => (r || []).forEach(x => { const n = Number(x); if (!Number.isNaN(n)) maxAbs = Math.max(maxAbs, Math.abs(n)); }));
+    if (!(maxAbs > 0)) maxAbs = 1;
+    const dense = rows.length * cols.length > 120;       // 量多：格子纯色，数值只在 hover
+    const div = (x) => {                                 // -1..1 → 蓝/白/红，幂次拉开中小值对比
+      const t = Math.max(-1, Math.min(1, Number(x) / maxAbs));
+      const e = Math.pow(Math.abs(t), 0.65);
+      const rgb = (t >= 0 ? [194, 65, 53] : [23, 105, 170]).map(c => Math.round(255 + (c - 255) * e));
+      return {bg: "rgb(" + rgb.join(",") + ")", t};
+    };
+    const th = (txt) => h("th", {style: {padding: "0 2px 4px", fontSize: "11px", color: C_MUTED,
+      fontWeight: 600, textAlign: "center", whiteSpace: "nowrap", background: "none", border: "none"}}, [txt]);
+    const table = h("table", {style: {borderCollapse: "separate", borderSpacing: "3px", width: "100%"}}, [
+      h("thead", {}, [h("tr", {}, [h("th"), ...cols.map(c => th(String(c)))])]),
+      h("tbody", {}, rows.map((rLabel, ri) => h("tr", {}, [
+        h("td", {style: {padding: "0 8px 0 0", fontSize: "12px", color: C_MUTED, whiteSpace: "nowrap", textAlign: "right"}}, [String(rLabel)]),
+        ...cols.map((cLabel, ci) => {
+          const x = (values[ri] || [])[ci];
+          const isNull = x === null || x === undefined || x === "" || Number.isNaN(Number(x));
+          const {bg, t} = isNull ? {bg: "#eef2f6", t: 0} : div(x);
+          return h("td", {style: {padding: "2px"}}, [h("div", {class: "heatmap-cell",
+            title: `${rLabel} · ${cLabel}：${isNull ? "无数据" : (title ? title + " " : "") + F(x)}`,
+            style: {background: bg, display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: "10px", lineHeight: "14px", color: Math.abs(t) > 0.55 ? "#ffffff" : C_STRONG}},
+            [dense ? "" : (isNull ? "—" : F(x))])]);
+        }),
+      ]))),
+    ]);
+    const short = (maxAbs >= 100 ? Math.round(maxAbs) : Math.round(maxAbs * 10) / 10).toLocaleString("en-US");
+    el.append(table, h("div", {style: {display: "flex", alignItems: "center", gap: "6px", marginTop: "10px",
+      fontSize: "11px", color: C_MUTED}}, [
+      h("span", {}, ["-" + short]),
+      h("span", {style: {width: "120px", height: "8px", borderRadius: "4px",
+        background: `linear-gradient(90deg, ${C_BLUE}, #ffffff 50%, ${C_RED})`}}, []),
+      h("span", {}, ["+" + short]),
+      h("span", {style: {marginLeft: "6px"}}, [title]),
+    ]));
+    return table;
+  },
+
+  sparkline(el, values = [], {width = 90, height = 28} = {}) {
+    el.innerHTML = "";
+    if (values.length < 2 || !_hasData(values)) {
+      el.append(h("span", {class: "empty", style: {display: "inline-block", padding: "2px 10px"}}, ["—"]));
+      return null;
+    }
+    el.style.width = width + "px";
+    el.style.height = height + "px";
+    return _mount(el, {
+      animation: false,
+      grid: {left: 0, right: 0, top: 1, bottom: 1},
+      xAxis: {type: "category", show: false, boundaryGap: false, data: values.map((_, i) => i)},
+      yAxis: {type: "value", show: false, scale: true},
+      tooltip: {show: false},
+      series: [{type: "line", showSymbol: false, connectNulls: false,
+        lineStyle: {width: 1.2, color: C_BLUE}, itemStyle: {color: C_BLUE},
+        data: values.map(x => x === undefined ? null : x),
+        areaStyle: {color: {type: "linear", x: 0, y: 0, x2: 0, y2: 1,
+          colorStops: [{offset: 0, color: "rgba(23,105,170,.22)"}, {offset: 1, color: "rgba(23,105,170,.02)"}]}}}],
+    });
+  },
+
+  table(el, {columns = [], rows = [], onRowClick} = {}) {
+    _dispose(el);                           // 同 heat：清掉 el 上可能残留的旧 echarts 实例
+    el.innerHTML = "";
+    if (!columns.length || !rows.length) { el.append(h("div", {class: "empty"}, ["暂无数据"])); return []; }
+    const cols = columns.map(c => (typeof c === "string" ? {key: c, label: c} : c));
+    const cell = (row, i) => (Array.isArray(row) ? row[i] : row[cols[i].key]);
+    const isNum = (x) => typeof x === "number" || (typeof x === "string" && x.trim() !== "" && !Number.isNaN(Number(x)));
+    const colNum = cols.map((c, i) => !!c.num || rows.some(r => isNum(cell(r, i))));
+    const thead = h("thead", {}, [h("tr", {}, cols.map((c, i) =>
+      h("th", {class: colNum[i] ? "num" : null}, [String(c.label === undefined ? c.key : c.label)])))]);
+    const trs = rows.map((row, ri) => h("tr", {
+      style: onRowClick ? {cursor: "pointer"} : null,
+      onclick: onRowClick ? () => onRowClick(row, ri) : null,
+    }, cols.map((c, i) => {
+      const v = cell(row, i);
+      const blank = v === null || v === undefined || v === "";
+      return h("td", {class: colNum[i] && !blank ? "num" : null}, [blank ? "—" : String(v)]);
+    })));
+    el.append(h("table", {class: "tbl"}, [thead, h("tbody", {}, trs)]));
+    return trs;
+  },
+
+  custom(el, opt) {
+    /* 预组装 option 直挂：axis/grid/tooltip/series 由调用方全权定制（卡④双
+       panel 散点等一次性形态），复用注册表的 dispose/resize 生命周期；
+       无 series → .empty（同 line/bar 惯例） */
+    if (!opt || !opt.series || !opt.series.length) return _empty(el);
+    return _mount(el, opt);
+  },
+};

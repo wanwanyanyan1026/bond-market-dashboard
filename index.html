@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gla 债券市场跟踪</title>
+<link rel="stylesheet" href="assets/css/terminal.css">
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="brand">gla 债券市场跟踪<small>本地周报级跟踪 · 零 CDN</small></div>
+  <nav id="nav" class="nav"><!-- App.init 注入全部面板 .menu-link + 生成报告菜单 --></nav>
+  <div class="sidebar-foot" id="sidebar-foot"><!-- 数据更新于 {DATA.meta.asOf} --></div>
+</aside>
+
+<main id="panel-root" class="main"></main>
+
+<!-- 依序：数据 → 图表库 → 图表封装 → 导出 → 各面板注册 → 应用路由 -->
+<script src="assets/data/data.js?v=2026-09-06.0912"></script>
+<script src="assets/js/echarts.min.js"></script>
+<script src="assets/js/charts.js"></script>
+<script src="assets/js/vendor/xlsx.min.js"></script>
+<script src="assets/js/export.js"></script>
+<script>
+/* ============================================================
+   panels/home.js — 首页 · 策略总览（Task 10）
+   结构：市场锚点行 → 多空对照 + 综合研判（2 列）→ 六板块摘要（2×3）
+   消费：App.h / App.fmt / App.badge / App.show（Task 8）、
+         Charts.line / barDiverge / heat（Task 9）、DATA.home + 各板块摘要
+   语义色（terminal.css）：收益率下行 = 利多 = 绿（.down）、
+         上行 = 利空 = 红（.up）；箭头方向 = 收益率变动方向（▼/▲）
+   空数据：各区块独立防御，锚点/因素/研判/摘要任一缺失渲染 .empty 不抛异常
+   ============================================================ */
+
+/* 回购定盘利率类序列（锚点卡底部标注口径用） */
+const _HOME_FIXING_KEYS = new Set(["FDR001", "FDR007", "FDR014", "FR001", "FR007", "FR014"]);
+
+PANELS["home"] = {
+  title: "首页",
+  icon: "🏠",
+
+  render(root) {
+    const D = (typeof DATA !== "undefined" && DATA) || {};
+    const brief = (D.home && D.home.brief) || {};
+    const factors = Array.isArray(brief.factors) ? brief.factors : [];
+    const view = brief.view || {};
+    const modules = (D.meta && D.meta.modules) || {};
+    const modBadge = (mod, fallback) =>
+      App.badge((modules[mod] && modules[mod].source) || fallback, modules[mod] && modules[mod].fetchedAt);
+
+    /* —— 1. 市场锚点行：大数字 + 周变动（bp，带符号与方向箭头）+ 实际口径 —— */
+    const anchors = (Array.isArray(D.home && D.home.anchors) ? D.home.anchors : []);
+    const chgSpan = (v) => {
+      if (v === null || v === undefined) return h("span", {class: "flat"}, ["周 —"]);
+      const cls = v > 0 ? "up" : v < 0 ? "down" : "flat";
+      const arrow = v > 0 ? "▲" : v < 0 ? "▼" : "";
+      return h("span", {class: cls},
+        ["周 ", arrow ? arrow + " " : "", v > 0 ? "+" : "", App.fmt(v, 1), " bp"]);
+    };
+    // 收益率行 as-of：优先锚点源（日频）自身末日 yieldsAsOf；全局 meta.asOf 混入
+    // 周度 W-SUN 标签（未来周日）时不得跟着显示未来日期
+    const asOf = (D.home && D.home.yieldsAsOf) || (D.meta && D.meta.asOf) || "";
+    const anchorsCard = h("section", {class: "card"}, [
+      anchors.length
+        ? [asOf ? h("div", {style: {fontSize: "12px", color: "var(--muted)", marginBottom: "6px"}},
+            ["收益率截至 " + asOf + "（周变动 bp）"]) : null,
+           h("div", {class: "anchor-row"}, anchors.map(a => h("div", {class: "anchor"}, [
+            h("div", {class: "anchor-label"}, [(a && a.key) || "—"]),
+            h("div", {class: "anchor-value"}, [App.fmt(a && a.value, 2)]),
+            h("div", {class: "anchor-chg"}, [chgSpan(a && a.wowBp)]),
+            (a && a.seriesKey)
+              ? h("div", {style: {fontSize: "11px", color: "var(--muted)", marginTop: "2px"}},
+                  ["口径 " + a.seriesKey + (_HOME_FIXING_KEYS.has(a.seriesKey) ? "（定盘）" : "")])
+              : null,
+          ])))]
+        : h("div", {class: "empty"}, ["暂无锚点数据"]),
+    ]);
+
+    /* —— 2a. 多空因素对照：方向色 + 强度 1-5 格 + 持续性；行点击跳转对应面板 —— */
+    const factorRow = (f) => {
+      f = f || {};
+      const dir = f.direction;
+      const dirCell = dir === "bull"
+        ? h("span", {style: {color: "var(--success)", fontWeight: 600, whiteSpace: "nowrap"}}, ["🟢 利多"])
+        : dir === "bear"
+          ? h("span", {style: {color: "var(--danger)", fontWeight: 600, whiteSpace: "nowrap"}}, ["🔴 利空"])
+          : h("span", {class: "flat"}, ["—"]);
+      const hasStrength = Number.isFinite(Number(f.strength)) && Number(f.strength) > 0;
+      const n = Math.max(1, Math.min(5, Math.round(Number(f.strength) || 0)));
+      const target = f.panel || f.panels;                 // panel 字段可能缺省（Task 16 LLM 简报定义）
+      return h("tr", (target && PANELS[target]) ? {style: {cursor: "pointer"}, onclick: () => App.show(target)} : {}, [
+        h("td", {}, [dirCell]),
+        h("td", {}, [f.text || "—"]),
+        h("td", {style: {whiteSpace: "nowrap", letterSpacing: "1px"}},
+          [hasStrength ? "■".repeat(n) + "□".repeat(5 - n) : "—"]),
+        h("td", {}, [f.duration || "—"]),
+      ]);
+    };
+    const factorsCard = h("section", {class: "card", id: "factors-card"}, [
+      h("h3", {class: "card-title"}, ["多空因素对照"]),
+      factors.length
+        ? [h("p", {class: "card-sub"}, ["点击因素行跳转对应面板 · 强度 1–5 格"]),
+           h("table", {class: "tbl"}, [
+             h("thead", {}, [h("tr", {}, ["方向", "因素", "强度", "持续性"].map(x => h("th", {}, [x])))]),
+             h("tbody", {}, factors.map(factorRow)),
+           ])]
+        : h("div", {class: "empty"}, ["策略因素待生成（LLM key 未配置时跳过）/ 可手工维护 brief_override.json"]),
+    ]);
+
+    /* —— 2b. 综合研判：三研判徽章 + 可折叠正文；overridden=true 显示“手工版”角标 —— */
+    const CLAMP = {display: "-webkit-box", WebkitLineClamp: "3", WebkitBoxOrient: "vertical", overflow: "hidden"};
+    const narrative = brief.narrative || "";
+    const narBody = h("div", {style: Object.assign({whiteSpace: "pre-line"}, CLAMP)}, [narrative]);
+    const expandBtn = h("button", {style: {display: "none", border: "none", background: "none",
+      padding: "4px 0", fontSize: "12px", color: "var(--blue)", cursor: "pointer"}}, ["展开全部 ▾"]);
+    let expanded = false;
+    expandBtn.addEventListener("click", () => {
+      expanded = !expanded;
+      Object.assign(narBody.style, expanded ? {display: "block", WebkitLineClamp: "", overflow: ""} : CLAMP);
+      expandBtn.textContent = expanded ? "收起 ▴" : "展开全部 ▾";
+    });
+    const viewCard = h("section", {class: "card", id: "view-card"}, [
+      h("h3", {class: "card-title"}, ["综合研判"]),
+      brief.overridden
+        ? h("span", {class: "chip warn", style: {position: "absolute", top: "13px", right: "14px"}}, ["手工版"])
+        : (brief.generatedAt ? App.badge("生成时间", brief.generatedAt) : null),
+      h("div", {style: {display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "12px"}},
+        [["rate", "利率方向"], ["curve", "曲线形态"], ["credit", "信用策略"]].map(([k, label]) =>
+          h("span", {class: "chip"}, [label + "：" + (view[k] || "—")]))),
+      narrative
+        ? h("div", {}, [narBody, expandBtn])
+        : h("div", {class: "empty"}, ["策略研判待生成（Task 16 LLM 接入后可用）/ 可手工维护 brief_override.json"]),
+    ]);
+
+    /* —— 3. 六板块摘要小图（300px 级卡片，点击跳转对应面板）—— */
+    const rs = (D.liquidity && D.liquidity.rateSeries) || {};
+    const rateKey = rs.DR007 ? "DR007" : rs.FDR007 ? "FDR007" : rs.FR007 ? "FR007" : null;   // 成交口径优先，定盘次之
+    const ratePick = rateKey ? rs[rateKey] : null;
+    const ws = (D.fiscal && D.fiscal.weeklySupply) || {};
+    const du = (D.institution && D.institution.duration) || {};
+    const we = (D.institution && D.institution.wealth) || {};
+    const nb = (D.institution && D.institution.netbuyMatrix) || {};
+    const pmi = ((D.fundamentals && D.fundamentals.macroTable) || [])
+      .find(r => /PMI/.test((r && r.key) || "") || /PMI/.test((r && r.name) || "")) || null;
+
+    const sumDefs = [
+      { title: "资金价格" + (rateKey ? "（" + rateKey + "）" : ""), panel: "liquidity", mod: "liquidity", src: "流动性",
+        height: 220,
+        draw: el => Charts.line(el, {yUnit: "%", range: "1Y", series: ratePick
+          ? [{name: rateKey, dates: ratePick.dates || [], values: ratePick.values || []}] : []}) },
+      { title: "政府债净供给", panel: "fiscal", mod: "fiscal", src: "财政",
+        height: 220,
+        draw: el => Charts.barDiverge(el, {dates: ws.dates || [], values: ws.net || [], yUnit: "亿元"}) },
+      { title: "债基久期（利率型）", panel: "institution", mod: "institution", src: "机构",
+        height: 220,
+        draw: el => Charts.line(el, {yUnit: "年", series: [{name: "利率型中位数",
+          dates: du.dates || [], values: du["利率型中位数"] || []}]}) },
+      { title: "理财规模（总量）", panel: "institution", mod: "institution", src: "机构",
+        height: 220,
+        draw: el => Charts.line(el, {yUnit: "万亿元", series: [{name: "理财规模",
+          dates: we.dates || [], values: we.total || []}]}) },
+      { title: "净买入热力（" + (nb.block || "全部") + "）", panel: "institution", mod: "institution", src: "机构",
+        height: null,                                    // DOM 热力图随内容自适应高度
+        draw: el => Charts.heat(el, {rows: nb.institutions || [], cols: nb.tenors || [], values: nb.values || [],
+          title: "净买入（亿元）", fmt: v => App.fmt(v, 0)}) },
+      { title: (pmi && pmi.key) || "PMI", panel: "fundamentals", mod: "macro", src: "宏观",
+        height: 220,
+        draw: el => Charts.line(el, {yUnit: (pmi && pmi.unit) || "%", range: "1Y", series: pmi
+          ? [{name: pmi.key, dates: (pmi.dates || []).slice(-12), values: (pmi.values || []).slice(-12)}] : []}) },
+    ];
+    const sumCards = sumDefs.map(def => {
+      const box = h("div", {style: def.height ? {height: def.height + "px"} : null,
+        onclick: e => e.stopPropagation()});             // 图表交互（range 切换条等）不冒泡触发跳转
+      const card = h("section", {class: "card sum-card", style: {cursor: "pointer"},
+        title: "点击查看「" + (PANELS[def.panel] ? PANELS[def.panel].title : def.panel) + "」面板",
+        onclick: () => App.show(def.panel)}, [
+        h("h3", {class: "card-title"}, [def.title]),
+        modBadge(def.mod, def.src),
+        box,
+      ]);
+      return {card, box, def};
+    });
+
+    /* 组装后统一绘制（echarts.init 需容器已在文档中取到非零宽高） */
+    root.append(Export.btn("home"));
+    root.append(
+      anchorsCard,
+      h("div", {class: "grid grid-2"}, [factorsCard, viewCard]),
+      h("div", {class: "grid grid-3"}, sumCards.map(c => c.card)),
+    );
+    sumCards.forEach(c => c.def.draw(c.box));
+    if (narrative && narBody.scrollHeight > narBody.clientHeight + 4) expandBtn.style.display = "";
+  },
+};
+</script>
+<script src="assets/js/panels/fundamentals.js"></script>
+<script src="assets/js/panels/industry.js"></script>
+<script src="assets/js/panels/fiscal.js"></script>
+<script src="assets/js/panels/liquidity.js"></script>
+<script src="assets/js/panels/institution.js"></script>
+<script src="assets/js/panels/assets.js"></script>
+<script src="assets/js/panels/value.js"></script>
+<script src="assets/js/panels/spread.js"></script>
+<script src="assets/js/panels/credit.js"></script>
+<script>
+/* ============================================================
+   panels/curve.js — 曲线凸点（信用债主体曲线 + 利率债曲线 + 凸点检测/挖掘）
+   每个主体/品种一个卡片：曲线图 + 凸点信号表
+   消费：DATA.curve = {asOf, issuers:[...], rateCurves:[...]}
+   ============================================================ */
+PANELS["curve"] = {
+  title: "曲线凸点",
+  icon: "〰️",
+
+  render(root) {
+    const D = (typeof DATA !== "undefined" && DATA) || {};
+    const C = D.curve || {};
+    const issuers = Array.isArray(C.issuers) ? C.issuers : [];
+    const rateCurves = Array.isArray(C.rateCurves) ? C.rateCurves : [];
+    const asOf = C.asOf || "";
+
+    /* 解读说明 */
+    const guideCard = h("section", {class: "card", style: {fontSize: "13px", lineHeight: "1.7"}}, [
+      h("h3", {class: "card-title"}, ["📖 如何看曲线凸点"]),
+      h("div", {}, [
+        h("p", {}, [h("b", {}, ["横轴 = 剩余期限（年，整数刻度）"]), "，纵轴 = 到期收益率（%）"]),
+        h("p", {}, [h("span", {style: {color: "#ef4444", fontWeight: 600}}, ["● 凸点（红色◆）"]),
+          "：曲线向上弯曲 → 该期限收益率", h("b", {}, ["高于"]), "曲线平滑预期 → ",
+          h("b", {style: {color: "#16a34a"}}, ["买入信号（收益率偏贵）"])]),
+        h("p", {}, [h("span", {style: {color: "#3b82f6", fontWeight: 600}}, ["● 凹点（蓝色◆）"]),
+          "：曲线向下弯曲 → 该期限收益率", h("b", {}, ["低于"]), "预期 → ",
+          h("b", {style: {color: "#dc2626"}}, ["避免或卖出（收益率偏便宜）"])]),
+        h("p", {}, ["z-score 衡量偏离程度：", h("b", {}, ["强≥2.5"]), " / 中≥2.0 / 弱≥1.5",
+          "。实操：找", h("span", {style: {color: "#ef4444"}}, ["凸点"]), "附近个券买入，获取相对同主体其他期限的超额收益。"]),
+      ]),
+    ]);
+
+    /* 信用债/利率债 tab */
+    const tabCredit = h("button", {class: "tab active", onclick: () => showSection("credit")}, ["信用债曲线"]);
+    const tabRate = h("button", {class: "tab", onclick: () => showSection("rate")}, ["利率债曲线"]);
+    const sectionBox = h("div", {id: "curve-section", style: {marginTop: "10px"}});
+
+    function showSection(section) {
+      tabCredit.classList.toggle("active", section === "credit");
+      tabRate.classList.toggle("active", section === "rate");
+      sectionBox.innerHTML = "";
+      if (section === "credit") drawCreditSection();
+      else drawRateSection();
+    }
+
+    /* ── 信用债：主体 tab + 曲线图 + 凸点表 ── */
+    function drawCreditSection() {
+      if (!issuers.length) {
+        sectionBox.append(h("div", {class: "empty"}, ["暂无信用债曲线数据——运行 python scripts/update.py --only curve 刷新"]));
+        return;
+      }
+      const tabs = h("div", {class: "tabs", style: {flexWrap: "wrap", gap: "4px"}});
+      const contentBox = h("div", {style: {marginTop: "10px"}});
+      issuers.forEach((iss, i) => {
+        const shortName = iss.name.length > 8 ? iss.name.slice(0, 8) + "…" : iss.name;
+        tabs.append(h("button", {
+          class: "tab" + (i === 0 ? " active" : ""),
+          "data-i": i, title: iss.name,
+          onclick: () => { tabs.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", +t.dataset.i === i)); drawIssuer(i); },
+        }, [shortName]));
+      });
+      sectionBox.append(h("section", {class: "card"}, [
+        h("h3", {class: "card-title"}, ["信用债主体曲线"]),
+        App.badge(`${issuers.length}个主体`, asOf),
+        h("p", {class: "card-sub"}, ["点击主体标签切换 · 曲线由个券估值Hermite插值 · 凸/凹点由二阶差分z-score检测"]),
+        tabs,
+      ]));
+      sectionBox.append(contentBox);
+
+      function drawIssuer(idx) {
+        contentBox.innerHTML = "";
+        const iss = issuers[idx];
+        if (!iss) return;
+        const curve = iss.curve || {};
+        const rawPts = iss.rawPoints || [];
+        const convex = iss.convexPoints || [];
+
+        const chartBox = h("div", {class: "chart", style: {height: "380px"}});
+        const curveCard = h("section", {class: "card"}, [
+          h("h3", {class: "card-title"}, [iss.name + " 信用债曲线"]),
+          App.badge(`${iss.bondCount}支券 · ${curve.method || "hermite"} · 最长${iss.maxTenor}Y`, asOf),
+          iss.error ? h("div", {class: "empty"}, [iss.error]) : null,
+        ]);
+
+        const convexBox = h("div");
+        const convexCard = h("section", {class: "card"}, [
+          h("h3", {class: "card-title"}, ["凸点/凹点信号"]),
+          h("p", {class: "card-sub"}, ["红色◆=凸点（买入信号）蓝色◆=凹点（避免/卖出信号）"]),
+        ]);
+
+        contentBox.append(curveCard, convexCard);
+
+        /* 绘制曲线 */
+        const series = [];
+        if (curve.tenors && curve.tenors.length && curve.yields && curve.yields.length) {
+          series.push({name: "收益率曲线", tenors: curve.tenors, yields: curve.yields,
+            lineStyle: {width: 2}});
+        }
+        if (rawPts.length) {
+          series.push({name: "个券估值", tenors: rawPts.map(p => p.tenor), yields: rawPts.map(p => p.yield),
+            symbolSize: 6, itemStyle: {color: "#6b7280"}, lineStyle: {width: 0}});
+        }
+        // 拆分凸点(红)和凹点(蓝)为两个series，确保小数期限也能渲染
+        const convexPts = convex.filter(c => c.direction === "凸");
+        const concavePts = convex.filter(c => c.direction === "凹");
+        if (convexPts.length) {
+          series.push({name: "凸点", tenors: convexPts.map(c => c.tenor), yields: convexPts.map(c => c.yield),
+            symbolSize: 14, symbol: "diamond",
+            itemStyle: {color: "#ef4444"}, lineStyle: {width: 0}});
+        }
+        if (concavePts.length) {
+          series.push({name: "凹点", tenors: concavePts.map(c => c.tenor), yields: concavePts.map(c => c.yield),
+            symbolSize: 14, symbol: "diamond",
+            itemStyle: {color: "#3b82f6"}, lineStyle: {width: 0}});
+        }
+
+        if (series.length) {
+          curveCard.append(chartBox);
+          drawTenorChart(chartBox, series, iss.maxTenor);
+        } else {
+          curveCard.append(h("div", {class: "empty"}, ["曲线数据不足"]));
+        }
+
+        /* 凸点表 */
+        if (convex.length) {
+          convexCard.append(convexBox);
+          const COLOR_C = {"凸": "#ef4444", "凹": "#3b82f6"};
+          convexBox.append(h("table", {class: "tbl"}, [
+            h("thead", {}, [h("tr", {},
+              ["期限(Y)", "收益率(%)", "二阶导", "z-Score", "方向", "强度", "附近个券"]
+                .map(t => h("th", {}, [t])))]),
+            h("tbody", {}, convex.map(p => h("tr", {}, [
+              h("td", {}, [App.fmt(p.tenor, 2)]),
+              h("td", {}, [App.fmt(p.yield, 4)]),
+              h("td", {}, [App.fmt(p.secondDeriv, 4)]),
+              h("td", {style: {fontWeight: 600}}, [App.fmt(p.zScore, 2)]),
+              h("td", {}, [h("span", {style: {color: COLOR_C[p.direction] || "#8a8f98", fontWeight: 600}}, [p.direction])]),
+              h("td", {}, [p.strength]),
+              h("td", {style: {fontSize: "12px"}}, [(p.nearbyBonds || []).join(", ") || "—"]),
+            ])))]));
+        } else {
+          convexCard.append(h("div", {class: "empty"}, ["无显著凸/凹点"]));
+        }
+      }
+      drawIssuer(0);
+    }
+
+    /* ── 利率债曲线 ── */
+    function drawRateSection() {
+      if (!rateCurves.length) {
+        sectionBox.append(h("div", {class: "empty"}, ["利率债曲线待构建（国债/国开/口行/农发）"]));
+        return;
+      }
+      // 类似信用债渲染逻辑
+      const tabs = h("div", {class: "tabs", style: {flexWrap: "wrap", gap: "4px"}});
+      const contentBox = h("div", {style: {marginTop: "10px"}});
+      rateCurves.forEach((rc, i) => {
+        tabs.append(h("button", {
+          class: "tab" + (i === 0 ? " active" : ""),
+          "data-i": i, title: rc.name,
+          onclick: () => { tabs.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", +t.dataset.i === i)); drawRate(i); },
+        }, [rc.name]));
+      });
+      sectionBox.append(h("section", {class: "card"}, [
+        h("h3", {class: "card-title"}, ["利率债曲线"]),
+        App.badge(`${rateCurves.length}个品种`, asOf),
+        tabs,
+      ]));
+      sectionBox.append(contentBox);
+
+      function drawRate(idx) {
+        contentBox.innerHTML = "";
+        const rc = rateCurves[idx];
+        if (!rc) return;
+        const curve = rc.curve || {};
+        const convex = rc.convexPoints || [];
+        const chartBox = h("div", {class: "chart", style: {height: "380px"}});
+        const card = h("section", {class: "card"}, [
+          h("h3", {class: "card-title"}, [rc.name + " 收益率曲线"]),
+          App.badge(curve.method || "hermite", asOf),
+        ]);
+        contentBox.append(card);
+
+        const series = [];
+        if (curve.tenors && curve.yields) {
+          series.push({name: "收益率曲线", tenors: curve.tenors, yields: curve.yields, lineStyle: {width: 2}});
+        }
+        // 拆分凸点(红)和凹点(蓝)
+        const convexPts = convex.filter(c => c.direction === "凸");
+        const concavePts = convex.filter(c => c.direction === "凹");
+        if (convexPts.length) {
+          series.push({name: "凸点", tenors: convexPts.map(c => c.tenor), yields: convexPts.map(c => c.yield),
+            symbolSize: 14, symbol: "diamond", itemStyle: {color: "#ef4444"}, lineStyle: {width: 0}});
+        }
+        if (concavePts.length) {
+          series.push({name: "凹点", tenors: concavePts.map(c => c.tenor), yields: concavePts.map(c => c.yield),
+            symbolSize: 14, symbol: "diamond", itemStyle: {color: "#3b82f6"}, lineStyle: {width: 0}});
+        }
+        if (series.length) { card.append(chartBox); drawTenorChart(chartBox, series, Math.ceil(Math.max(...(curve.tenors || [10])))); }
+        else { card.append(h("div", {class: "empty"}, ["曲线数据不足"])); }
+
+        if (convex.length) {
+          const COLOR_C = {"凸": "#ef4444", "凹": "#3b82f6"};
+          contentBox.append(h("section", {class: "card"}, [
+            h("h3", {class: "card-title"}, ["凸点/凹点信号"]),
+            h("table", {class: "tbl"}, [
+              h("thead", {}, [h("tr", {}, ["期限(Y)", "收益率(%)", "z-Score", "方向", "强度"].map(t => h("th", {}, [t])))]),
+              h("tbody", {}, convex.map(p => h("tr", {}, [
+                h("td", {}, [App.fmt(p.tenor, 2)]), h("td", {}, [App.fmt(p.yield, 4)]),
+                h("td", {style: {fontWeight: 600}}, [App.fmt(p.zScore, 2)]),
+                h("td", {}, [h("span", {style: {color: COLOR_C[p.direction] || "#8a8f98", fontWeight: 600}}, [p.direction])]),
+                h("td", {}, [p.strength]),
+              ])))]),
+          ]));
+        }
+      }
+      drawRate(0);
+    }
+
+    /* ── 共用：期限x轴echarts渲染（整数刻度） ── */
+    function drawTenorChart(box, series, maxTenor) {
+      const maxT = Math.ceil(maxTenor || 10);
+      const xTicks = Array.from({length: maxT + 1}, (_, i) => i);
+      const opts = {
+        tooltip: {trigger: 'axis', axisPointer: {type: 'cross'},
+          formatter: params => params.map(p => `${p.seriesName}: ${Number(p.axisValue).toFixed(1)}Y → ${App.fmt(Array.isArray(p.value) ? p.value[1] : p.value, 4)}%`).join('<br>')},
+        legend: {data: series.map(s => s.name), bottom: 0, type: 'scroll'},
+        grid: {top: 34, left: 50, right: 20, bottom: 40},
+        xAxis: {type: 'value', name: '剩余期限(Y)', min: 0, max: maxT,
+                interval: maxT <= 10 ? 1 : maxT <= 20 ? 2 : 5,
+                axisLabel: {fontSize: 11}, splitLine: {show: true, lineStyle: {type: 'dashed', opacity: 0.3}}},
+        yAxis: {type: 'value', name: '%', axisLabel: {fontSize: 11},
+                scale: true},
+        series: series.map((s, i) => ({
+          name: s.name, type: 'line',
+          data: s.tenors.map((t, j) => [t, s.yields[j]]),
+          symbolSize: s.symbolSize || (i === 0 ? 0 : 4),
+          lineStyle: s.lineStyle || {width: 2},
+          itemStyle: s.itemStyle || {},
+          symbol: s.symbol || 'circle',
+          smooth: i === 0 ? 0.2 : false,
+          connectNulls: true,
+        })),
+      };
+      return Charts.custom(box, opts);
+    }
+
+    root.append(Export.btn("curve"));
+    root.append(guideCard);
+    root.append(h("div", {style: {display: "flex", gap: "8px", marginBottom: "8px"}}, [tabCredit, tabRate]));
+    root.append(sectionBox);
+    showSection("credit");
+  },
+};
+</script>
+<script src="assets/js/app.js"></script>
+
+</body>
+</html>

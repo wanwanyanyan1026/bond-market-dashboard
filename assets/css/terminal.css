@@ -1,0 +1,270 @@
+/* ============================================================
+   terminal.css — 债市跟踪 UI 设计体系（浅色 terminal 风）
+   变量值逐字取自 docs/specs/2026-08-28-bond-market-tracker-design.md §6
+   零外部依赖：无 CDN 字体 / 无外链
+   ============================================================ */
+
+:root {
+  /* —— §6 调色板（逐字复制）—— */
+  --bg: #f6f9fc;
+  --surface: #ffffff;
+  --surface-soft: #f4f8fb;
+  --line: #d8e2eb;        /* 主线条（表头下边等） */
+  --line-soft: #e8eef4;   /* 弱线条（行分隔等） */
+  --text: #425466;
+  --text-strong: #0a2540;
+  --muted: #587086;
+  --blue: #1769aa;
+  --blue-strong: #0b4f87;
+  --blue-soft: #e8f1fa;
+  --danger: #c24135;      /* 跌 / 利空 / 收益率上行 */
+  --success: #16865c;     /* 涨 / 利多 / 收益率下行 */
+  --warning: #9a6500;
+  --sidebar: 245px;
+  --shadow: 0 2px 5px rgba(50, 50, 93, .045), 0 10px 24px rgba(10, 37, 64, .04);
+  --radius: 10px;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+/* —— 基础 —— */
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+}
+button { font-family: inherit; }
+a { color: var(--blue); text-decoration: none; }
+a:hover { color: var(--blue-strong); }
+
+/* ============================================================
+   布局：侧边栏（固定 245px 深色）+ 主区
+   ============================================================ */
+.sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: var(--sidebar);
+  display: flex;
+  flex-direction: column;
+  background: var(--text-strong);   /* 深色锚点取自 §6 变量表 */
+  overflow-y: auto;
+}
+.brand {
+  padding: 20px 18px 16px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+  letter-spacing: .5px;
+}
+.brand small { display: block; font-size: 11px; font-weight: 400; color: rgba(232, 241, 250, .55); }
+.nav { display: flex; flex-direction: column; padding: 10px 0; flex: 1; }
+
+.menu-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 18px;
+  background: none;
+  border: none;
+  border-left: 3px solid transparent;
+  font-size: 14px;
+  color: rgba(232, 241, 250, .72);
+  cursor: pointer;
+  text-align: left;
+}
+.menu-link:hover { background: rgba(255, 255, 255, .07); color: #ffffff; }
+.menu-link.active {
+  background: var(--blue-strong);
+  border-left-color: var(--blue);
+  color: #ffffff;
+  font-weight: 600;
+}
+.menu-ico {
+  width: 22px;
+  text-align: center;
+  font-style: normal;
+  font-size: 15px;
+}
+.sidebar-foot {
+  padding: 14px 18px;
+  font-size: 11px;
+  color: rgba(232, 241, 250, .5);
+  border-top: 1px solid rgba(255, 255, 255, .08);
+  white-space: nowrap;
+}
+
+.main {
+  margin-left: var(--sidebar);
+  padding: 24px 28px 56px;
+  min-height: 100vh;
+  max-width: 1560px;
+}
+.panel-h {
+  margin: 0 0 16px;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+/* ============================================================
+   卡片：白底 + §6 阴影 + 圆角（badge 需要相对定位锚点）
+   ============================================================ */
+.card {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px 18px;
+  margin-bottom: 16px;
+}
+.card-title {
+  margin: 0 0 12px;
+  padding-right: 180px;          /* 给右上角 badge 留位 */
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+.card-sub { margin: -8px 0 12px; font-size: 12px; color: var(--muted); }
+
+/* 数据源角标：muted 小字，绝对定位在卡片右上角 */
+.badge {
+  position: absolute;
+  top: 13px;
+  right: 14px;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* 卡片网格（面板布局用） */
+.grid { display: grid; gap: 16px; }
+.grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+/* ECharts 容器：面板渲染时给出定高，避免 0 高度 */
+.chart { width: 100%; height: 320px; }
+.chart-sm { width: 100%; height: 90px; }
+
+/* ============================================================
+   表格：表头浅底 / 行 hover / 数字右对齐 .num
+   ============================================================ */
+.tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.tbl th {
+  padding: 8px 10px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-weight: 600;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.tbl td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--text);
+}
+.tbl tbody tr:hover { background: var(--surface-soft); }
+.tbl .num, .tbl td.num, .tbl th.num { text-align: right; }
+.tbl .strong { color: var(--text-strong); font-weight: 600; }
+
+/* ============================================================
+   首页锚点行：大数字 + wowBp 涨跌色小字
+   ============================================================ */
+.anchor-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 32px;
+}
+.anchor { min-width: 120px; }
+.anchor-label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.anchor-value {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+}
+.anchor-chg { font-size: 12px; white-space: nowrap; }
+
+/* ============================================================
+   涨跌色（债市语义）：收益率下行 = 利多 = 绿；上行 = 红。
+   纯数据量的涨跌（发行量/规模等）为中性，直接用 var(--blue)。
+   ============================================================ */
+.up   { color: var(--danger); }   /* 收益率上行 / 利空 */
+.down { color: var(--success); }  /* 收益率下行 / 利多 */
+.flat { color: var(--muted); }
+
+/* ============================================================
+   Tab（券种切换等）
+   ============================================================ */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 12px;
+}
+.tab {
+  padding: 6px 14px;
+  font-size: 13px;
+  color: var(--muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+.tab:hover { color: var(--blue); }
+.tab.active {
+  color: var(--blue-strong);
+  border-bottom-color: var(--blue);
+  font-weight: 600;
+}
+
+/* ============================================================
+   热力图基类：红买 / 蓝卖的具体颜色由 JS 按净买入量级内联，
+   这里只提供形状与缺省底
+   ============================================================ */
+.heatmap-cell {
+  width: 100%;
+  height: 26px;
+  border-radius: 4px;
+  background: var(--surface-soft);
+}
+
+/* ============================================================
+   小组件：chip 标签 / empty 暂无数据占位
+   ============================================================ */
+.chip {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: var(--blue-soft);
+  color: var(--blue-strong);
+  white-space: nowrap;
+}
+.chip.warn { background: #fdf3e2; color: var(--warning); }
+
+.empty {
+  padding: 48px 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+  background: var(--surface-soft);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+}
+
+/* 1280px 桌面单页为最低支持宽度，无需移动端适配 */
