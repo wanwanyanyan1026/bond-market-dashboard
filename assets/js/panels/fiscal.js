@@ -7,6 +7,8 @@
    ③ 季节性累计：Charts.seasonal 年内按周对齐多年累计线（封装自带当年高亮）
    ④ 下周供给展望：小表 + note 灰字；空表落 .empty 提示 manual 兜底
    ⑤ 供给计划矩阵：planTable 转置成"月份为列"的小卡，横向滚动
+   ⑥ 一级发行明细（MCP）：地方债/国债各 100 条 × 10 列，数字列检测 +
+     立即绘制（纯 DOM 表无尺寸要求，循 planCard 先例）
    消费：App.h / App.fmt / App.badge（app.js）、
          Charts.table / line / barDiverge / seasonal（charts.js）
    数据注记：
@@ -166,12 +168,35 @@ PANELS["fiscal"] = {
           months.map((m, i) => ["m" + m, num(pRows[i][j + 1]) ? App.fmt(pRows[i][j + 1], 2) : pRows[i][j + 1]])))),
       });                                // 纯 DOM 表，挂载先后无尺寸要求
     }
+    /* —— ⑥ 一级发行明细（MCP）：地方债/国债两表，数字列检测 + 立即绘制 —— */
+    function primaryCard(title, id, t) {
+      const pCols = Array.isArray(t.columns) ? t.columns : [];
+      const pRows = Array.isArray(t.rows) ? t.rows : [];
+      const box = h("div", {id: id + "-table"});
+      const card = h("section", {class: "card", id: id}, [
+        h("h3", {class: "card-title"}, [title]),
+        App.badge("遇见投资MCP · 一级发行", fetchedAt),
+        h("p", {class: "card-sub"}, ["最近 100 条 · 期限(年)/规模(亿)/利率(%)/利差(bp) · 横向滚动查看"]),
+        pRows.length ? h("div", {style: {overflowX: "auto"}}, [box])
+          : h("div", {class: "empty"}, ["一级发行明细待接入"]),
+      ]);
+      const pNum = pCols.map((_, i) => i >= 5 && pRows.some((r) => num(r[i])));   // 数字列检测限定数值列区间（代码列纯数字串不误判）
+      if (pRows.length) Charts.table(box, {
+        columns: pCols.map((c, i) => ({key: "k" + i, label: c, num: pNum[i]})),
+        rows: pRows.map((r) => Object.fromEntries(pCols.map((_, i) =>
+          ["k" + i, pNum[i] && num(r[i]) ? App.fmt(r[i], 2) : r[i]]))),
+      });                                // 纯 DOM 表无尺寸要求，append 前绘制（循 ⑤ planCard 先例）
+      return card;
+    }
+    const plgbCard = primaryCard("地方债一级发行明细", "fiscal-primary-lgb", F.primaryLgb || {});
+    const pgovCard = primaryCard("国债一级发行明细", "fiscal-primary-gov", F.primaryGov || {});
 
     /* 组装后统一绘制（echarts.init 需容器在文档中取非零宽高）。
        季节性 10 年图例较宽 → 全幅；下周展望与计划矩阵两张小卡并排 */
     root.append(Export.btn("fiscal"));
     root.append(progCard, weeklyCard, seasonCard,
-      h("div", {class: "grid grid-2"}, [nextCard].concat(planCard ? [planCard] : [])));
+      h("div", {class: "grid grid-2"}, [nextCard].concat(planCard ? [planCard] : [])),
+      h("div", {class: "grid grid-2"}, [plgbCard, pgovCard]));
     drawProg();
     drawWeekly("net");
     drawSeasonal("合计");

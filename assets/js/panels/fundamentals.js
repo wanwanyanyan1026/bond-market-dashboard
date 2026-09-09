@@ -1,8 +1,9 @@
 /* ============================================================
    panels/fundamentals.js — 基本面（Task 11）
-   三区：①宏观数据表（Charts.table + 走势 sparkline 列 + 行点击 modal）
+   四区：①宏观数据表（Charts.table + 走势 sparkline 列 + 行点击 modal）
         ②本周数据及政策梳理（events 纵向时间线，manual 维护）
         ③海外关键指标表 + 美债四序列折线（2Y/10Y/30Y · 联邦基金）
+        ④货币政策表态记录（MCP 50 条：日期/来源/标题/基调/摘要，全文本列）
    消费：App.h / App.fmt / App.badge（Task 8）、
          Charts.line / seasonal / sparkline / table（Task 9）
    变动列语义：宏观数据无债市利多属性，按数值涨跌中性惯例——
@@ -168,6 +169,18 @@ PANELS["fundamentals"] = {
             ])))
         : h("div", {class: "empty"}, ["待手工维护 manual_inputs/events.json"]),
     ]);
+    /* —— ④ 货币政策表态（MCP）：近 50 条，全文本列（无数字列检测） —— */
+    const pol = F.policy || {};
+    const polCols = Array.isArray(pol.columns) ? pol.columns : [];
+    const polRows = Array.isArray(pol.rows) ? pol.rows : [];
+    const polBox = h("div", {id: "fund-policy-table"});
+    const policyCard = h("section", {class: "card", id: "fund-policy-card"}, [
+      h("h3", {class: "card-title"}, ["货币政策表态"]),
+      App.badge("遇见投资MCP · 货币政策", pol.as_of),
+      h("p", {class: "card-sub"}, ["近 50 条央行/官方表态 · 基调口径如实显示，摘要截 200 字"]),
+      polRows.length ? h("div", {style: {overflowX: "auto"}}, [polBox])
+        : h("div", {class: "empty"}, ["货币政策表态数据待接入"]),
+    ]);
     const ovBox = h("div", {});
     const usyBox = h("div", {class: "chart"});
     const ovCard = h("section", {class: "card", id: "ov-card"}, [
@@ -184,9 +197,13 @@ PANELS["fundamentals"] = {
 
     /* 组装后统一绘制（echarts.init 需容器已在文档中取到非零宽高）；modal 随面板挂 root，切面板自动移除 */
     root.append(Export.btn("fundamentals"));
-    root.append(macroCard, eventsCard, h("div", {class: "grid grid-2"}, [ovCard, usyCard]), modal);
+    root.append(macroCard, eventsCard, policyCard, h("div", {class: "grid grid-2"}, [ovCard, usyCard]), modal);
     buildTable(macroBox, macroRows, true);
     buildTable(ovBox, ovRows, true);
+    if (polRows.length) Charts.table(polBox, {
+      columns: polCols.map((c, i) => ({key: "k" + i, label: c})),
+      rows: polRows.map((r) => Object.fromEntries(polCols.map((_, i) => ["k" + i, r[i]]))),
+    });
     /* 美债四序列同轴 %：2Y/10Y/30Y（build 注入 usy2y/usy10y/usy30y）+
        联邦基金目标利率（overseas 表行自带 dates/values）；缺数据的序列自动不出 */
     const usySeries = [["美债2Y", ov.usy2y], ["美债10Y", ov.usy10y], ["美债30Y", ov.usy30y]]

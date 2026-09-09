@@ -1,12 +1,14 @@
 /* ============================================================
    panels/institution.js — 机构行为（Task 15）
-   五区：① 机构现券净买入热力图（券种 tab，"全部"块 = netbuyMatrix
+   六区：① 机构现券净买入热力图（券种 tab，"全部"块 = netbuyMatrix
             本体，其余从 netbuyMatrixAll[block] 重取，DOM 热力重渲前清容器）
         ② 机构净买入周度折线（板块 tab × 8 机构图例多选，默认勾 3 条活跃）
         ③ 理财规模（总量万亿 / 分类型亿元 量纲不同，封装无双轴 → 两图并排）
         ④ 债基久期（3 风格中位数 + 分歧度_全部 同轴 line，2019 起）
         ⑤ 债券市场杠杆率（银行间/全市场/非银/交易所 4 线同轴周度 line ↔
             分序列 ISO 周序号 W1–W53 季节性，卡内切换）
+        ⑥ 理财监测（MCP）：净值指数/分运作模式收益率/分投资方向收益率/
+            破净率/负收益占比/未达业绩基准占比 6 组 tab（键序字母序 → 显式定序）
    实现注记：
    - 折线未采用"全 40 序列入图"：Charts.line 图例非滚动式且 grid.top 固定
      34px，40 项换行会压住绘图区；按指令允许的退化方案改为"板块 tab +
@@ -124,6 +126,31 @@ PANELS["institution"] = {
              byTypeSeries.length ? wealthByBox : h("div", {class: "empty"}, ["分投资类型待接入"])])
         : h("div", {class: "empty"}, ["理财规模数据待接入"]),
     ]);
+    /* —— ⑥ 理财监测（MCP）：6 组 tab——键序字母序，显式定序呈现 —— */
+    const wm = I.wealthMcp || {};
+    const WM_DEFS = [["nav", "净值指数", ""], ["yield_mode", "分运作模式收益率", "%"],
+                     ["yield_dir", "分投资方向收益率", "%"], ["break_rate", "破净率", "%"],
+                     ["neg_ret", "负收益占比", "%"], ["miss_goal", "未达业绩基准占比", "%"]];
+    const wmDefs = WM_DEFS.filter(([k]) => wm[k] && Object.keys(wm[k]).length);
+    const wmTabs = h("div", {class: "tabs", id: "inst-wealthmcp-tabs"},
+      wmDefs.map(([k, label], i) => h("button", {class: "tab" + (i === 0 ? " active" : ""),
+        "data-k": k, onclick: () => drawWealthMcp(k)}, [label])));
+    const wmBox = h("div", {id: "inst-wealthmcp-chart", class: "chart"});
+    const wealthMcpCard = h("section", {class: "card", id: "inst-wealthmcp-card"}, [
+      h("h3", {class: "card-title"}, ["理财监测"]),
+      App.badge("遇见投资MCP · 理财数据", fetchedAt),
+      h("p", {class: "card-sub"}, ["净值指数（中长债/偏债混合/短债，无量纲）· 其余为 % · 近 50 条周频"]),
+      wmDefs.length ? [wmTabs, wmBox] : h("div", {class: "empty"}, ["理财监测数据待接入"]),
+    ]);
+    function drawWealthMcp(k) {
+      const def = wmDefs.find(([kk]) => kk === k) || wmDefs[0];
+      wmTabs.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.k === def[0]));
+      const wseries = Object.entries(wm[def[0]] || {})
+        .filter(([, s]) => s && Array.isArray(s.dates) && s.dates.length && has(s.values))
+        .map(([name, s]) => ({name, dates: s.dates, values: s.values}));
+      wmBox.innerHTML = "";       // line 会留切换条+内层 box → 换挂前清
+      Charts.line(wmBox, {series: wseries, yUnit: def[2], range: "3Y"});
+    }
 
     /* —— ④ 债基久期：3 风格中位数 + 分歧度 同轴（数值量级相近） —— */
     const du = I.duration || {};
@@ -209,7 +236,7 @@ PANELS["institution"] = {
     /* 组装后统一绘制（echarts.init 需容器已在文档中取非零宽高）：
        热力/折线全幅，理财全幅（内含两图并排），久期+杠杆率并排 */
     root.append(Export.btn("institution"));
-    root.append(heatCard, netbuyCard, wealthCard,
+    root.append(heatCard, netbuyCard, wealthCard, wealthMcpCard,
       h("div", {class: "grid grid-2"}, [durationCard, leverageCard]));
 
     if (heatBlocks.length || allBlocks.length) drawHeat(heatBlocks[0] || allBlocks[0]);
@@ -217,6 +244,7 @@ PANELS["institution"] = {
     if (weOk && has(we.total)) Charts.line(wealthTotalBox,
       {series: [{name: "理财规模总量", dates: we.dates, values: we.total}], yUnit: "万亿元", range: "ALL"});
     if (byTypeSeries.length) Charts.line(wealthByBox, {series: byTypeSeries, yUnit: "亿元", range: "ALL"});
+    if (wmDefs.length) drawWealthMcp(wmDefs[0][0]);
     if (duSeries.length) Charts.line(duBox, {series: duSeries, yUnit: "年", range: "ALL"});
     if (levOk) drawLev("line");
   },

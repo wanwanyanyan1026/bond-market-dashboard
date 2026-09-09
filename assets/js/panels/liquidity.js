@@ -18,6 +18,8 @@
    ⑦ 下周展望：columns 优先读数据侧、缺则 4 列兜底；空 rows 落 .empty
    ⑧ 超储率：月度超储率 line（%）+ 周度超额准备金 bar（亿元）双频对照——
      单位不同不共轴，两图上下排布（Charts.bar 单色柱，v3-task-3）
+   ⑨ 资金供需（MCP）：银行/大行/中小行/货基/基金/理财/保险/非银总计/
+     其他资管/券商 日度净供需 10 线（亿元，键无前缀直取）
    消费：App.h / App.fmt / App.badge（app.js）、
          Charts.line / bar / barDiverge / table（charts.js）
    ============================================================ */
@@ -143,6 +145,17 @@ PANELS["liquidity"] = {
       h("p", {class: "card-sub"}, ["大行/中小行净融出余额周均 · 2025-12-29 口径切换（大型银行/中小型银行构成变化），前后构成有差异"]),
       bank.length ? bankBox : h("div", {class: "empty"}, ["银行融出数据待接入"]),
     ]);
+    /* —— ⑨ 资金供需（MCP）：各机构净供需 10 线（键无前缀直取） —— */
+    const funding = Object.entries(L.funding || {})
+      .filter(([, s]) => s && Array.isArray(s.dates) && s.dates.length && has(s.values))
+      .map(([name, s]) => ({name, dates: s.dates, values: s.values}));
+    const fundBox = h("div", {id: "liq-funding", class: "chart"});
+    const fundingCard = h("section", {class: "card", id: "liq-funding-card"}, [
+      h("h3", {class: "card-title"}, ["资金供需（各机构净额）"]),
+      App.badge("遇见投资MCP · 资金供需", fetchedAt),
+      h("p", {class: "card-sub"}, ["银行/大行/中小行/货基/基金/理财/保险/非银总计/其他资管/券商 日度净供需 · 单位亿元"]),
+      funding.length ? fundBox : h("div", {class: "empty"}, ["资金供需数据待接入"]),
+    ]);
 
     /* —— ⑤ 存单：分期限表 + 一级利率 line（vs MLF 政策线待 OMO 源） —— */
     const ncd = L.ncd || {};
@@ -195,7 +208,7 @@ PANELS["liquidity"] = {
     /* 组装后统一绘制（echarts.init 需容器在文档中取非零宽高）：
        利率图全幅，银行融出+存单、票据+下周展望两两并排 */
     root.append(Export.btn("liquidity"));
-    root.append(ratesCard, chartCard, omoCard, reserveCard,
+    root.append(ratesCard, chartCard, omoCard, reserveCard, fundingCard,
       h("div", {class: "grid grid-2"}, [bankCard, ncdCard]),
       h("div", {class: "grid grid-2"}, [billCard, nextCard]));
 
@@ -221,6 +234,7 @@ PANELS["liquidity"] = {
     ], yUnit: "%", range: "5Y"});                       // 5Y 默认覆盖 2021-12 起全史
     if (rvWHas) Charts.bar(rvWBox, {dates: rvW.dates, values: rvW.values, yUnit: "亿元"});
     if (bank.length) Charts.line(bankBox, {series: bank, yUnit: "亿元", range: "3Y"});
+    if (funding.length) Charts.line(fundBox, {series: funding, yUnit: "亿元", range: "3Y"});
     if (ntRows.length) Charts.table(ncdTableBox, {                   // 表结构随源（当前空）原样消费
       columns: ntCols.map((c, i) => ({key: "k" + i, label: c})), rows: ntRows});
     if (nrs.length) Charts.line(ncdChartBox, {series: nrs, yUnit: "%", range: "3Y"});
