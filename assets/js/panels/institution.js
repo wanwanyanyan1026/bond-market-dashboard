@@ -98,6 +98,8 @@ PANELS["institution"] = {
         const months = Math.max(1, Math.round((new Date(ds[ds.length - 1]) - new Date(ds[0])) / 864e5 / 30.44));
         nbHint.textContent = "历史自 " + ds[0].slice(0, 7) + "（约 " + months + " 个月"
           + (months < 12 ? "，不足 1 年，1Y/3Y/5Y 切换暂显示相同区间" : "") + "）";
+        const today = new Date().toISOString().slice(0, 10);
+        if (ds[ds.length - 1] > today) nbHint.textContent += " · 最新一周(" + ds[ds.length - 1] + ")为不完整周，仅含部分交易日";
       }
       nbChart = Charts.line(nbBox, {series: nbSeries, yUnit: "亿元", range: "3Y"});
       if (nbChart) {
@@ -243,7 +245,11 @@ PANELS["institution"] = {
     if (nbBlocks.length) drawNetbuy(nbBlocks[0]);
     if (weOk && has(we.total)) Charts.line(wealthTotalBox,
       {series: [{name: "理财规模总量", dates: we.dates, values: we.total}], yUnit: "万亿元", range: "ALL"});
-    if (byTypeSeries.length) Charts.line(wealthByBox, {series: byTypeSeries, yUnit: "亿元", range: "ALL"});
+    if (byTypeSeries.length) Charts.line(wealthByBox, {series: byTypeSeries, yUnit: "亿元", range: "ALL",
+      markLine: {symbol: "none", silent: true, animation: false,
+        label: {formatter: "口径调整", position: "insideEndTop", color: "#c0392b", fontSize: 11},
+        lineStyle: {color: "#c0392b", type: "dashed", width: 1.2},
+        data: [{xAxis: "2026-08-28"}]}});
     if (wmDefs.length) drawWealthMcp(wmDefs[0][0]);
     if (duSeries.length) Charts.line(duBox, {series: duSeries, yUnit: "年", range: "ALL"});
     if (levOk) drawLev("line");

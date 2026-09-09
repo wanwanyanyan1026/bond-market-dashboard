@@ -17,7 +17,7 @@
 <main id="panel-root" class="main"></main>
 
 <!-- 依序：数据 → 图表库 → 图表封装 → 导出 → 各面板注册 → 应用路由 -->
-<script src="assets/data/data.js?v=2026-09-09.1315"></script>
+<script src="assets/data/data.js?v=2026-09-09.1529"></script>
 <script src="assets/js/echarts.min.js"></script>
 <script src="assets/js/charts.js"></script>
 <script src="assets/js/vendor/xlsx.min.js"></script>
@@ -203,6 +203,133 @@ PANELS["home"] = {
 <script src="assets/js/panels/value.js"></script>
 <script src="assets/js/panels/spread.js"></script>
 <script src="assets/js/panels/credit.js"></script>
+<script>
+/* ============================================================
+   panels/quant.js — 量化模块（债券择时信号）
+   单卡只读展示：
+     债券择时信号（本地近似·马尔可夫）：最新信号大字 + 四因子组状态chips
+        + 近36月信号时间线 + 方法论脚注
+   消费：DATA.quant = {asOf, bondSignal:{...}}、App.badge/fmt、h
+   ============================================================ */
+PANELS["quant"] = {
+  title: "量化信号",
+  icon: "🧮",
+
+  render(root) {
+    const D = (typeof DATA !== "undefined" && DATA) || {};
+    const Q = D.quant || {};
+    const sig = Q.bondSignal || null;
+
+    /* —— 颜色：债券语境（跌=利好债券=绿，涨=利空债券=红）—— */
+    const C_SIG = {"积极": "#1f8a5f", "中性": "#8a8f98", "风险": "#c24135"};
+    const C_STATE = {"跌": "#1f8a5f", "涨": "#c24135", null: "#8a8f98"};
+
+    const pct = (v, d) => (v === null || v === undefined || v === "" ? "—" :
+      (Number(v) * 100).toFixed(d == null ? 2 : d) + "%");
+
+    /* ============ 债券择时信号卡 ============ */
+    function cardSignal() {
+      if (!sig) return h("div", {class: "empty"}, ["暂无债券信号——storage/macro.csv + liquidity.csv 缺失或 Markov 失败，跑 python scripts/update.py --only quant 刷新"]);
+
+      const L = sig.latest || {};
+      const hist = sig.history || [];
+      const groups = L.groups || [];
+
+      /* —— 最新信号大字 —— */
+      const sigColor = C_SIG[L.signal] || "#8a8f98";
+      const bigSig = h("div", {style: {display: "flex", alignItems: "baseline", gap: "14px",
+        flexWrap: "wrap", padding: "10px 12px", borderRadius: "6px",
+        background: "var(--bg-soft, #f5f6f8)", marginBottom: "12px"}}, [
+        h("span", {style: {fontSize: "12px", color: "var(--muted)"}}, [L.month + " 最新信号"]),
+        h("span", {style: {fontSize: "26px", fontWeight: 800, color: sigColor}}, [L.signal]),
+        h("span", {style: {fontSize: "13px", color: "var(--muted)"}},
+          ["打分 " + (L.score >= 0 ? "+" : "") + L.score + " / +3"]),
+      ]);
+
+      /* —— 四因子组状态 chips —— */
+      const chips = groups.map(g => {
+        const sc = C_STATE[g.state];
+        return h("div", {style: {border: "1px solid var(--border, #e3e5e8)", borderRadius: "6px",
+          padding: "8px 10px", minWidth: "150px", background: "var(--card, #fff)"}}, [
+          h("div", {style: {display: "flex", justifyContent: "space-between", alignItems: "center"}}, [
+            h("span", {style: {fontWeight: 600}}, [g.name]),
+            h("span", {style: {fontSize: "15px", fontWeight: 700, color: sc}},
+              [g.state || "—"]),
+          ]),
+          h("div", {style: {fontSize: "11px", color: "var(--muted)", marginTop: "4px"}}, [
+            g.series +
+            (g.fallback ? " · 回退动量" : "") +
+            (g.prob != null ? " · P(涨)=" + (g.prob * 100).toFixed(0) + "%" : ""),
+          ]),
+          h("div", {style: {fontSize: "12px", marginTop: "2px", fontVariantNumeric: "tabular-nums"}},
+            ["最新读数 " + (g.last != null ? App.fmt(g.last, 2) : "—")]),
+          h("div", {style: {fontSize: "11px", color: "var(--muted)", marginTop: "2px"}},
+            [g.contrib === null ? "参考·不入分" : "贡献 " + (g.contrib >= 0 ? "+" : "") + g.contrib]),
+        ]);
+      });
+      const chipsRow = h("div", {style: {display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "12px"}}, chips);
+
+      /* —— 全历史信号时间线（中心基线，正分↑/负分↓，色=信号）—— */
+      const tl = hist.slice(-150);
+      const UNIT = 6, HALF = 22;
+      const bars = tl.map(hm => {
+        const sc = hm.score || 0;
+        const mag = Math.abs(sc);
+        const col = C_SIG[hm.signal] || "#8a8f98";
+        const opa = hm.signal === "中性" ? 0.6 : 0.95;
+        const bh = mag * UNIT + 2;
+        const topGap = sc >= 0 ? (HALF - bh) : HALF;
+        return h("div", {title: hm.month + " · " + hm.signal + " (score " + (sc >= 0 ? "+" : "") + sc + ")",
+          style: {width: "4px", height: "44px", display: "flex", flexDirection: "column", flexShrink: "0"}},
+          [h("div", {style: {height: topGap + "px"}}),
+           h("div", {style: {height: bh + "px", background: col, opacity: opa, borderRadius: "1px"}}),
+           h("div", {style: {flex: "1"}})]);
+      });
+      const timeline = tl.length ? h("div", {}, [
+        h("div", {style: {fontSize: "13px", fontWeight: 600, color: "var(--muted)", margin: "4px 0 6px"}},
+          ["信号时间线 · 全 " + tl.length + " 月（柱高=|score|，↑正分/↓负分，色=信号）"]),
+        h("div", {style: {display: "flex", alignItems: "center", gap: "1px", height: "44px",
+          overflowX: "auto", overflowY: "hidden", position: "relative",
+          borderTop: "1px solid var(--border, #e3e5e8)", borderBottom: "1px solid var(--border, #e3e5e8)"}},
+          [h("div", {style: {position: "absolute", left: 0, right: 0, top: HALF + "px", height: "1px",
+            background: "var(--border, #e3e5e8)", pointerEvents: "none"}}), ...bars]),
+        h("div", {style: {display: "flex", justifyContent: "space-between", fontSize: "11px",
+          color: "var(--muted)", marginTop: "2px"}},
+          [tl[0].month, tl[tl.length - 1].month]),
+      ]) : h("div", {class: "empty"}, ["无历史"]);
+
+      /* —— 信号分布 —— */
+      const dist = {};
+      hist.forEach(hm => { dist[hm.signal] = (dist[hm.signal] || 0) + 1; });
+      const distTxt = ["积极", "中性", "风险"].map(s =>
+        (dist[s] || 0) + " " + s).join(" · ");
+
+      return h("section", {class: "card", id: "quant-signal"}, [
+        h("h3", {class: "card-title"}, ["债券择时信号 · 马尔可夫"]),
+        App.badge("本地近似 · 非官方口径", sig.asOf),
+        bigSig,
+        chipsRow,
+        timeline,
+        h("p", {style: {fontSize: "11px", color: "var(--muted)", marginTop: "10px", lineHeight: 1.6}}, [
+          sig.method || "",
+          "；窗口 " + (sig.window || "?") + "（" + (sig.nMonths || 0) + " 月）；历史分布 " + distTxt + "。",
+          " 三因子各 ±1（parity → score∈{−3,−1,+1,+3}），±2 阈值实需三因子高度同向。",
+        ]),
+      ]);
+    }
+
+    /* —— 挂载 —— */
+    root.append(Export.btn("quant"));
+    if (!sig) {
+      root.append(h("section", {class: "card"}, [
+        h("div", {class: "empty"}, ["暂无量化信号——跑 python scripts/update.py --only quant 并 build 刷新"]),
+      ]));
+      return;
+    }
+    if (sig) root.append(cardSignal());
+  },
+};
+</script>
 <script>
 /* ============================================================
    panels/curve.js — 曲线凸点（信用债主体曲线 + 利率债曲线 + 凸点检测/挖掘）

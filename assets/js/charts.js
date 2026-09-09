@@ -102,7 +102,7 @@ function _clipPairs(dates, values, days, anchorTs) {
 
 const Charts = {
 
-  line(el, {series = [], yUnit = "", range = "3Y"} = {}) {
+  line(el, {series = [], yUnit = "", range = "3Y", markLine} = {}) {
     if (!series.length || !series.some(s => _hasData(s.values))) return _empty(el);
     const RANGES = {"1Y": 365, "3Y": 1095, "5Y": 1825, "ALL": Infinity};
     if (!(range in RANGES)) range = "3Y";
@@ -124,9 +124,10 @@ const Charts = {
         legend: {top: 0, icon: "roundRect", itemWidth: 14, itemHeight: 4, textStyle: {color: C_TEXT}},
         xAxis: _axisX({type: "time"}),
         yAxis: _axisY(yUnit),
-        series: series.map(s => ({name: s.name, type: "line", showSymbol: false, connectNulls: false,
+        series: series.map((s, i) => ({name: s.name, type: "line", showSymbol: false, connectNulls: false,
           lineStyle: {width: s.dashed ? 1.4 : 1.6, type: s.dashed ? "dashed" : "solid"},
           step: s.step ? "end" : false,
+          markLine: (i === 0 && markLine) ? markLine : undefined,
           emphasis: {focus: "series"}, data: _clipPairs(s.dates || [], s.values || [], RANGES[r], anchorTs)})),
       }), {notMerge: true});
       chart.resize();
