@@ -169,15 +169,17 @@ PANELS["fundamentals"] = {
             ])))
         : h("div", {class: "empty"}, ["待手工维护 manual_inputs/events.json"]),
     ]);
-    /* —— ④ 货币政策表态（MCP）：近 50 条，全文本列（无数字列检测） —— */
+    /* —— ④ 货币政策表态（MCP）：近 5 条，全文本列（无数字列检测） —— */
     const pol = F.policy || {};
     const polCols = Array.isArray(pol.columns) ? pol.columns : [];
-    const polRows = Array.isArray(pol.rows) ? pol.rows : [];
+    const polRows = (Array.isArray(pol.rows) ? pol.rows : [])
+      .slice().sort((a, b) => String(b[0] || "").localeCompare(String(a[0] || "")))
+      .slice(0, 5);
     const polBox = h("div", {id: "fund-policy-table"});
     const policyCard = h("section", {class: "card", id: "fund-policy-card"}, [
       h("h3", {class: "card-title"}, ["货币政策表态"]),
       App.badge("遇见投资MCP · 货币政策", pol.as_of),
-      h("p", {class: "card-sub"}, ["近 50 条央行/官方表态 · 基调口径如实显示，摘要截 200 字"]),
+      h("p", {class: "card-sub"}, ["近 5 条央行/官方表态 · 按日期降序 · 摘要截 200 字"]),
       polRows.length ? h("div", {style: {overflowX: "auto"}}, [polBox])
         : h("div", {class: "empty"}, ["货币政策表态数据待接入"]),
     ]);

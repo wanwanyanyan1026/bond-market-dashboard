@@ -171,12 +171,14 @@ PANELS["fiscal"] = {
     /* —— ⑥ 一级发行明细（MCP）：地方债/国债两表，数字列检测 + 立即绘制 —— */
     function primaryCard(title, id, t) {
       const pCols = Array.isArray(t.columns) ? t.columns : [];
-      const pRows = Array.isArray(t.rows) ? t.rows : [];
+      const pRows = (Array.isArray(t.rows) ? t.rows : [])
+        .slice().sort((a, b) => String(b[0] || "").localeCompare(String(a[0] || "")))
+        .slice(0, 10);
       const box = h("div", {id: id + "-table"});
       const card = h("section", {class: "card", id: id}, [
         h("h3", {class: "card-title"}, [title]),
         App.badge("遇见投资MCP · 一级发行", fetchedAt),
-        h("p", {class: "card-sub"}, ["最近 100 条 · 期限(年)/规模(亿)/利率(%)/利差(bp) · 横向滚动查看"]),
+        h("p", {class: "card-sub"}, ["最近 10 条 · 按日期降序 · 期限(年)/规模(亿)/利率(%)/利差(bp) · 横向滚动查看"]),
         pRows.length ? h("div", {style: {overflowX: "auto"}}, [box])
           : h("div", {class: "empty"}, ["一级发行明细待接入"]),
       ]);
