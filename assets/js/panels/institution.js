@@ -48,8 +48,8 @@ PANELS["institution"] = {
     const heatBox = h("div", {id: "inst-heat"});
     const heatCard = h("section", {class: "card", id: "inst-heat-card"}, [
       h("h3", {class: "card-title"}, ["机构现券净买入（机构 × 期限）"]),
-      App.badge("自建存储 · 现券净买入", (I.netbuyMatrix || {}).asOf || fetchedAt),
-      h("p", {class: "card-sub"}, ["券种 tab 切换 · 红=净买入，蓝=净卖出 · 单位亿元/周 · 截至" + ((I.netbuyMatrix || {}).asOf || "—") + "当周" + (((I.netbuyMatrix || {}).asOf || "") > new Date().toISOString().slice(0, 10) ? "（不完整周，仅含部分交易日）" : "")]),
+      App.badge("自建存储 · 现券净买入", fetchedAt),
+      h("p", {class: "card-sub"}, ["券种 tab 切换 · 红=净买入，蓝=净卖出 · 单位亿元/周 · 截至当日 " + new Date().toISOString().slice(0, 10) + (((I.netbuyMatrix || {}).asOf || "") > new Date().toISOString().slice(0, 10) ? "（当周不完整，仅含部分交易日）" : "")]),
       heatTabs,
       heatBox,
     ]);

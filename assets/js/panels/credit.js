@@ -1,7 +1,7 @@
 /* ============================================================
    panels/credit.js — 信用舆情跟踪（feature/credit-opinion）
    单卡只读展示（录入在 V:/债市跟踪UI/舆情跟踪.xlsx，页面零表单）：
-     统计条：正面/中性/负面/其他 计数 chip（点击=筛选开关，单选 toggle）
+     统计条：偏正面/中性/偏负面/其他 计数 chip（点击=筛选开关，单选 toggle）
      筛选区：起止日期 + 全字段关键词搜索 + 分页
      表格：7 列按日期倒序；摘要/分析/后续 可展开完整内容；正负面彩色文字
      分页：每页10条，底部分页导航
@@ -16,12 +16,12 @@ PANELS["credit"] = {
     const D = (typeof DATA !== "undefined" && DATA) || {};
     const C = D.credit || {};
     const items = Array.isArray(C.items) ? C.items.slice() : [];
-    const STANCES = ["正面", "中性", "负面", "其他"];
-    const COLOR = {"正面": "#1f8a5f", "中性": "#8a8f98", "负面": "#c24135", "其他": "#b8a26b"};
+    const STANCES = ["偏正面", "中性", "偏负面", "其他"];
+    const COLOR = {"偏正面": "#1f8a5f", "中性": "#8a8f98", "偏负面": "#c24135", "其他": "#b8a26b"};
     const PAGE_SIZE = 10;
     const state = {stance: "", from: "", to: "", kw: "", page: 1};
 
-    const cnt = {"正面": 0, "中性": 0, "负面": 0, "其他": 0};
+    const cnt = {"偏正面": 0, "中性": 0, "偏负面": 0, "其他": 0};
     items.forEach(it => { if (cnt[it.stance] !== undefined) cnt[it.stance]++; });
 
     const chips = STANCES.map(s => h("button", {class: "chip", "data-stance": s,
@@ -88,7 +88,7 @@ PANELS["credit"] = {
       const td = (v) => h("td", {}, [(v === "" || v === null || v === undefined) ? "—" : String(v)]);
       body.append(h("table", {class: "tbl"}, [
         h("thead", {}, [h("tr", {},
-          ["日期", "主体名称", "正负面", "舆情摘要", "舆情分析", "后续跟踪/处置进展", "研究员"]
+          ["日期", "主体名称", "偏正负面", "舆情摘要", "舆情分析", "后续跟踪/处置进展", "研究员"]
             .map(t => h("th", {}, [t])))]),
         h("tbody", {}, pageRows.map(it => h("tr", {}, [
           td(it.date), td(it.issuer),

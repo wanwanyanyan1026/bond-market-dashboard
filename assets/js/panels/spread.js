@@ -1,11 +1,12 @@
 /* ============================================================
    panels/spread.js — 利差跟踪（Phase C Task 3 → v5 Task 5 重构）
-   四卡（消费 data.js spread 段，Task 2/T4 派生）：
+   五卡（消费 data.js spread 段，Task 2/T4 派生，2026-09-10 增资本债-中票卡）：
      ⓪ 利差追踪-全部（页面最顶）——8 品种勾选 chips 同刷 2×2
         （YTM3Y / 期限3Y-1Y / 品种3Y / 等级3Y），至少保留 1 品种；
         .chip 无 on/off 底样式 → onclick 同步切 opacity 灰显勾选态
-     ① 周度快照表——35 行按段拆 4 表（利率债 14：收益率 % +
-        期限利差 bp / 银行资本债 8 / 中票 11 / 等级利差 2），
+     ① 周度快照表——45 行按段拆 5 表（利率债 14：收益率 % +
+        期限利差 bp / 银行资本债 8 / 中票 11 / 等级利差 2 /
+        资本债-中票 10），
         变动列正=红 .up / 负=绿 .down / 零 .flat（assets.js 表格
         涨跌色后处理惯例），一律 bp；3年分位列（滚动 3 年窗口百分位）
      ②' 品种利差明细——8 品种 tab × 2×2（YTM 分期限 / 期限利差 /
@@ -29,6 +30,107 @@ PANELS["spread"] = {
     const has = (v) => Array.isArray(v) && v.some((x) => x !== null && x !== undefined && x !== "" && !Number.isNaN(Number(x)));
     const num = (v) => v !== null && v !== undefined && v !== "" && !Number.isNaN(Number(v));
     const BADGE = "财汇中债曲线 · 二级2018-12起 永续约2021起 · 基准统一vs国开";
+
+    /* —— 变动总览卡：水平发散条形图，时间范围可选 1周/1月/3月/半年/1年 —— */
+    const GROUP_ORDER = ["bank", "mtn", "grade", "bankmtn"];
+    const GROUP_LABEL = {bank: "银行资本债信用利差", mtn: "中票信用利差",
+                         grade: "等级利差", bankmtn: "资本债-中票品种利差"};
+    const RANGES = [["1周", 0], ["1月", 30], ["3月", 90], ["半年", 182], ["1年", 365]];
+    // 收集 31 条信用利差序列（bank+mtn+grade+bankmtn），保留 src 引用
+    const chgItems = Object.values(seriesMap)
+      .filter(s => s && GROUP_ORDER.includes(s.group))
+      .sort((a, b) => GROUP_ORDER.indexOf(a.group) - GROUP_ORDER.indexOf(b.group)
+             || a.label.localeCompare(b.label));
+    // 快照 name→行 映射（1 周用）
+    const snapByName = {};
+    snap.rows.forEach(r => { snapByName[r.name] = r; });
+
+    function chgOverDays(dates, values, days) {
+      if (!dates.length) return null;
+      const last = values[values.length - 1];
+      if (last == null) return null;
+      if (days === 0) return 0;  // degenerate
+      const lastTs = new Date(dates[dates.length - 1]).getTime();
+      const cutTs = lastTs - days * 864e5;
+      let base = null;
+      for (let i = dates.length - 1; i >= 0; i--) {
+        const t = new Date(dates[i]).getTime();
+        if (t <= cutTs) { base = values[i]; break; }
+      }
+      if (base == null) return null;
+      return Math.round((last - base) * 100) / 100;
+    }
+
+    function buildChgData(rangeIdx) {
+      const days = RANGES[rangeIdx][1];
+      const names = [], vals = [];
+      let prevGroup = "";
+      chgItems.forEach(s => {
+        if (s.group !== prevGroup) {
+          names.push("── " + GROUP_LABEL[s.group] + " ──");
+          vals.push(null);
+          prevGroup = s.group;
+        }
+        names.push(s.label);
+        if (days === 0) {
+          // 1周：直接取 snapshot chg
+          const row = snapByName[s.label];
+          vals.push(row ? row.chg : null);
+        } else {
+          vals.push(chgOverDays(s.dates, s.values, days));
+        }
+      });
+      return {names, vals};
+    }
+
+    const chgBox = h("div", {id: "spread-chg-chart", class: "chart", style: {height: "500px"}});
+    const chgTabs = h("div", {class: "tabs"}, RANGES.map(([label], i) =>
+      h("button", {class: "tab" + (i === 0 ? " active" : ""), "data-ri": i,
+        onclick: () => drawChg(i)}, [label])));
+    let chgChart = null;
+    function drawChg(rangeIdx) {
+      chgTabs.querySelectorAll(".tab").forEach(b =>
+        b.classList.toggle("active", +b.dataset.ri === rangeIdx));
+      const {names, vals} = buildChgData(rangeIdx);
+      const opt = {
+        grid: {left: 10, right: 30, top: 10, bottom: 10, containLabel: true},
+        tooltip: {trigger: "axis", backgroundColor: "#fff", borderColor: "#ddd",
+          textStyle: {fontSize: 12, color: "#333"},
+          formatter: p => {
+            const v = p[0];
+            if (v.value == null) return v.name;
+            const sign = v.value > 0 ? "+" : "";
+            return `${v.name}<br/><b style="color:${v.value >= 0 ? '#c24135' : '#16865c'}">${sign}${v.value}bp</b>`;
+          }},
+        xAxis: {type: "value", axisLabel: {fontSize: 11, formatter: v => (v > 0 ? "+" : "") + v + "bp"},
+          splitLine: {lineStyle: {type: "dashed", opacity: 0.3}}},
+        yAxis: {type: "category", data: names, inverse: true,
+          axisLabel: {fontSize: 11, width: 155, overflow: "truncate",
+            formatter: v => v.startsWith("──") ? `{seg|${v}}` : v,
+            rich: {seg: {fontSize: 11, fontWeight: "bold", color: "var(--blue)"}}}},
+        series: [{type: "bar", barMaxWidth: 14,
+          itemStyle: {color: p => p.value == null ? "transparent"
+            : p.value >= 0 ? "#c24135" : "#16865c", borderRadius: 2},
+          data: vals}],
+      };
+      if (!chgChart) {
+        const el = chgBox;
+        el.innerHTML = "";
+        chgChart = echarts.init(el);
+        chgChart.setOption(opt);
+      } else {
+        chgChart.setOption(opt, {notMerge: true});
+      }
+    }
+    const chgCard = h("section", {class: "card", id: "spread-chg-card"}, [
+      h("h3", {class: "card-title"}, ["利差变动总览"]),
+      App.badge("财汇中债曲线 · 变动一律 bp", fetchedAt),
+      h("p", {class: "card-sub"}, [chgItems.length
+        ? "正=利差走阔(红) / 负=利差收窄(绿) · 1周=周度快照chg · 其他区间取区间首末值差"
+        : "利差变动总览待接入（python scripts/update.py --only spread）"]),
+      chgItems.length ? [chgTabs, chgBox] : h("div", {class: "empty"}, ["利差变动数据待接入"]),
+    ]);
+
 
     /* —— ⓪ 利差追踪-全部（页面最顶）：品种勾选 + 2×2（YTM3Y / 期限3Y-1Y / 品种3Y / 等级3Y）—— */
     const variety = Array.isArray(S.variety) ? S.variety : [];
@@ -81,9 +183,12 @@ PANELS["spread"] = {
 
     /* —— ① 周度快照表：35 行按段拆 4 张表（Charts.table 纯 DOM，构建期即可画）—— */
     const seg = (n) => n.startsWith("商业银行") ? 1 : n.startsWith("中票") ? 2
-      : n.startsWith("等级利差") ? 3 : 0;
+      : n.startsWith("等级利差") ? 3
+      : n.startsWith("二级资本债-中票") || n.startsWith("永续债-中票")
+        || n.startsWith("银行永续债-中票") ? 4 : 0;
     const SEG_TITLES = ["利率债收益率与期限利差", "银行资本债信用利差（vs 国开）",
-                        "中票信用利差（vs 国开）", "等级利差（中票）"];
+                        "中票信用利差（vs 国开）", "等级利差（中票）",
+                        "银行资本债-中票品种利差（同等级同期限）"];
     const snapTables = snap.rows.length ? SEG_TITLES.map((t, gi) => {
       const rows = snap.rows.filter((r) => seg(r.name) === gi);
       const box = h("div", {id: "spread-snap-table-" + gi});
@@ -138,6 +243,23 @@ PANELS["spread"] = {
       bankSeries.length ? bankBox : h("div", {class: "empty"}, ["银行资本债利差序列待接入"]),
     ]);
 
+    /* —— ③ 银行资本债-中票品种利差（bankmtn 组 10 线，同等级同期限）—— */
+    const mtnSeries = Object.values(seriesMap).map(pick).filter(Boolean)
+      .filter((s) => s.src.group === "bankmtn");
+    const mtnBox = h("div", {id: "spread-bankmtn-chart", class: "chart"});
+    const bankmtnCard = h("section", {class: "card", id: "spread-bankmtn-card"}, [
+      h("h3", {class: "card-title"}, ["银行资本债-中票品种利差（同等级同期限）"]),
+      App.badge("财汇中债曲线 · 资本债 减 同档中票", fetchedAt),
+      h("p", {class: "card-sub"}, [mtnSeries.length
+        ? "截至 " + snap.asOf + " · " + mtnSeries.length + " 线 · " + (() => {
+        const a = mtnSeries.find(s => s.name.includes("AAA-") && s.name.includes("1Y"));
+        return "AAA- 档 1/3/5/7Y" + (a ? "（" + a.dates[0] + " 起）" : "") + " × 二级/永续 + AA+ 档 3Y × 二级/银行永续（财汇 AA+ 资本债曲线仅 3Y）";
+      })()
+          + " · 当前值/变动/3年分位见上方快照表（详单在 tooltip）"
+        : "资本债-中票品种利差序列待接入"]),
+      mtnSeries.length ? mtnBox : h("div", {class: "empty"}, ["资本债-中票品种利差序列待接入"]),
+    ]);
+
     /* —— ②' 品种利差明细：8 品种 tab × 2×2（YTM 分期限 / 期限利差 / 品种利差 / 等级利差）—— */
     const DET_TITLES = [["ytm", "到期收益率（分期限，%）"], ["term", "期限利差（bp）"],
                         ["credit", "品种利差 vs 国开（分期限，bp）"], ["grade", "等级利差（3Y，bp）"]];
@@ -179,9 +301,11 @@ PANELS["spread"] = {
 
     /* 组装后统一绘制（echarts.init 需容器在文档中取非零宽高）：全部卡最顶、银行资本债改全幅单卡 */
     root.append(Export.btn("spread"));
-    root.append(allCard, snapCard, detailCard, bankCard);
+    root.append(chgCard, snapCard, allCard, detailCard, bankCard, bankmtnCard);
 
+    if (chgItems.length) { drawChg(0); }
     if (variety.length) { redrawAll(); drawDetail(variety[0].name); }
     if (bankSeries.length) Charts.line(bankBox, {series: bankSeries, yUnit: "bp", range: "3Y"});
+    if (mtnSeries.length) Charts.line(mtnBox, {series: mtnSeries, yUnit: "bp", range: "1Y"});
   },
 };

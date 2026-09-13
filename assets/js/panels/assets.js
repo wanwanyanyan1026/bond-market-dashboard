@@ -251,7 +251,7 @@ PANELS["assets"] = {
 
     /* 组装后统一绘制：主卡/次卡全幅，比价卡两列并排（第三卡出现时自然换行） */
     root.append(Export.btn("assets"));
-    root.append(perfCard, retCard, monthlyCard, h("div", {class: "grid grid-2"}, ratioCards), hprCard);
+    root.append(hprCard, perfCard, retCard, monthlyCard, h("div", {class: "grid grid-2"}, ratioCards));
 
     if (perfSeries.length) drawPerf("3Y");
     if (hprTabs.length) drawHpr(hprTabs.some(([, k]) => k === "monthly") ? "monthly" : hprTabs[0][1]);

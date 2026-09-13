@@ -17,7 +17,7 @@
 <main id="panel-root" class="main"></main>
 
 <!-- 依序：数据 → 图表库 → 图表封装 → 导出 → 各面板注册 → 应用路由 -->
-<script src="assets/data/data.js?v=2026-09-10.0815"></script>
+<script src="assets/data/data.js?v=2026-09-13.2132"></script>
 <script src="assets/js/echarts.min.js"></script>
 <script src="assets/js/charts.js"></script>
 <script src="assets/js/vendor/xlsx.min.js"></script>
@@ -205,11 +205,15 @@ PANELS["home"] = {
 <script src="assets/js/panels/credit.js"></script>
 <script>
 /* ============================================================
-   panels/quant.js — 量化模块（债券择时信号）
-   单卡只读展示：
-     债券择时信号（本地近似·马尔可夫）：最新信号大字 + 四因子组状态chips
-        + 近36月信号时间线 + 方法论脚注
-   消费：DATA.quant = {asOf, bondSignal:{...}}、App.badge/fmt、h
+   panels/quant.js — 量化模块（债券择时信号 + 信用三因子择券轮动）
+   双卡只读展示：
+     债券择时信号（本地近似·马尔可夫）：原理/使用说明 + 最新信号大字 + 四因子组状态chips
+        + 信号vs中债财富指数对照图(◆=拐点) + 历史胜率统计 + 方法论脚注
+     信用三因子择券轮动（均值回归·周频）：原理 + 最新持有组合/换仓指令 + top5候选
+        + 三因子chips + 周频净值(策略@5bp vs 16曲线等权 vs 信用债指数参照)
+        + 成本敏感性/绩效/分年表 + 方法论脚注
+   消费：DATA.quant = {asOf, bondSignal:{...}, creditRotation:{latest,backtest,...}}、
+        App.badge/fmt、h、Charts.custom
    ============================================================ */
 PANELS["quant"] = {
   title: "量化信号",
@@ -219,6 +223,7 @@ PANELS["quant"] = {
     const D = (typeof DATA !== "undefined" && DATA) || {};
     const Q = D.quant || {};
     const sig = Q.bondSignal || null;
+    const cr = Q.creditRotation || null;
 
     /* —— 颜色：债券语境（跌=利好债券=绿，涨=利空债券=红）—— */
     const C_SIG = {"积极": "#1f8a5f", "中性": "#8a8f98", "风险": "#c24135"};
@@ -229,11 +234,25 @@ PANELS["quant"] = {
 
     /* ============ 债券择时信号卡 ============ */
     function cardSignal() {
-      if (!sig) return h("div", {class: "empty"}, ["暂无债券信号——storage/macro.csv + liquidity.csv 缺失或 Markov 失败，跑 python scripts/update.py --only quant 刷新"]);
-
       const L = sig.latest || {};
       const hist = sig.history || [];
       const groups = L.groups || [];
+      const bt = sig.backtest || null;
+
+      /* —— 信号原理（卡顶）—— */
+      const guide = h("div", {style: {border: "1px solid var(--border, #e3e5e8)", borderRadius: "6px",
+        padding: "8px 12px", marginBottom: "12px", fontSize: "12px", lineHeight: 1.7,
+        color: "var(--muted)", background: "var(--bg-soft, #f5f6f8)"}}, [
+        h("div", {style: {fontWeight: 700, color: "var(--text, #222)", marginBottom: "2px"}},
+          ["📖 信号原理与依据"]),
+        h("div", {}, [h("b", {}, ["构造："]), "增长（制造业PMI）、通胀（CPI/PPI 同比均值）、货币（OMO 7天利率）"
+          + " 三组基本面序列各自跑马尔可夫两状态模型，平滑概率>50% 判定该因子处于「涨 / 跌」区制。"]),
+        h("div", {}, [h("b", {}, ["打分："]), "因子跌（经济走弱 / 资金利率降）= 利好债券 +1，因子涨 = 利空 -1 → "
+          + "score ∈ -3..+3；≥+2 积极、≤-2 风险、其余中性；流动性（M1）仅参考不入分。"]),
+        h("div", {}, [h("b", {}, ["依据："]), "基本面与资金利率同步下行的阶段，利率下行、债券总回报为正的概率更高；反之亦然。"]),
+        h("div", {}, [h("b", {}, ["局限："]), "区制状态极持久，历史上多数月份停留在 ±1 中性区，"
+          + "±2 阈值需三因子高度同向才触发。"]),
+      ]);
 
       /* —— 最新信号大字 —— */
       const sigColor = C_SIG[L.signal] || "#8a8f98";
@@ -244,6 +263,20 @@ PANELS["quant"] = {
         h("span", {style: {fontSize: "26px", fontWeight: 800, color: sigColor}}, [L.signal]),
         h("span", {style: {fontSize: "13px", color: "var(--muted)"}},
           ["打分 " + (L.score >= 0 ? "+" : "") + L.score + " / +3"]),
+      ]);
+
+      /* —— 如何使用 —— */
+      const usage = h("div", {style: {border: "1px solid var(--border, #e3e5e8)", borderRadius: "6px",
+        padding: "8px 12px", marginBottom: "12px", fontSize: "12px", lineHeight: 1.7,
+        color: "var(--muted)"}}, [
+        h("div", {style: {fontWeight: 700, color: "var(--text, #222)", marginBottom: "2px"}}, ["🧭 如何使用"]),
+        h("div", {}, [
+          h("span", {style: {fontWeight: 700, color: C_SIG["积极"]}}, ["积极（+2~+3）"]), " → 利好债券：拉长久期 / 超配；",
+          h("span", {style: {fontWeight: 700, color: C_SIG["风险"]}}, ["风险（-2~-3）"]), " → 利空债券：缩短久期 / 降配；",
+          h("span", {style: {fontWeight: 700, color: C_SIG["中性"]}}, ["中性（±1）"]), " → 方向不明：标配观望。",
+        ]),
+        h("div", {}, [h("b", {}, ["节奏："]), "月频信号，随每月 CPI/PPI 公布（次月 9-10 日）刷新；数据未出前沿用上月。"]),
+        h("div", {}, [h("b", {}, ["定位："]), "中期方向参考（月度级别），不作短线择时；建议与资金面 / 机构行为模块互相验证。"]),
       ]);
 
       /* —— 四因子组状态 chips —— */
@@ -269,34 +302,91 @@ PANELS["quant"] = {
       });
       const chipsRow = h("div", {style: {display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "12px"}}, chips);
 
-      /* —— 全历史信号时间线（中心基线，正分↑/负分↓，色=信号）—— */
-      const tl = hist.slice(-150);
-      const UNIT = 6, HALF = 22;
-      const bars = tl.map(hm => {
-        const sc = hm.score || 0;
-        const mag = Math.abs(sc);
-        const col = C_SIG[hm.signal] || "#8a8f98";
-        const opa = hm.signal === "中性" ? 0.6 : 0.95;
-        const bh = mag * UNIT + 2;
-        const topGap = sc >= 0 ? (HALF - bh) : HALF;
-        return h("div", {title: hm.month + " · " + hm.signal + " (score " + (sc >= 0 ? "+" : "") + sc + ")",
-          style: {width: "4px", height: "44px", display: "flex", flexDirection: "column", flexShrink: "0"}},
-          [h("div", {style: {height: topGap + "px"}}),
-           h("div", {style: {height: bh + "px", background: col, opacity: opa, borderRadius: "1px"}}),
-           h("div", {style: {flex: "1"}})]);
-      });
-      const timeline = tl.length ? h("div", {}, [
+      /* —— 信号 vs 中债财富指数 对照图（ECharts，挂载后绘制）—— */
+      const chartBox = h("div", {style: {height: "250px", width: "100%"}});
+      const drawOverlay = () => {
+        const mo = (bt && bt.monthly) || [];
+        if (!mo.length || !mo.some(x => x.i != null)) {
+          chartBox.append(h("div", {class: "empty"}, ["暂无对照数据（需 assets.csv 中债财富指数）"]));
+          return;
+        }
+        const marks = [];
+        for (let i = 1; i < mo.length; i++) {
+          if (mo[i].s !== mo[i - 1].s && mo[i].i != null) marks.push({
+            coord: [mo[i].m, mo[i].i], symbol: "diamond", symbolSize: 11,
+            itemStyle: {color: "#e6a23c"},
+            label: {show: true, formatter: mo[i].m, position: "top", fontSize: 10, color: "#b07818"},
+          });
+        }
+        Charts.custom(chartBox, {
+          tooltip: {trigger: "axis", axisPointer: {type: "line"},
+            formatter: ps => {
+              const x = ps[0] && ps[0].axisValue;
+              const row = mo.find(v => v.m === x);
+              if (!row) return "";
+              return [x,
+                "指数 " + App.fmt(row.i, 1),
+                "score " + (row.s >= 0 ? "+" : "") + row.s + "（" + row.g + "）",
+                row.r == null ? null : "次月指数回报 " + (row.r >= 0 ? "+" : "") + Number(row.r).toFixed(2) + "%",
+              ].filter(Boolean).join("<br>");
+            }},
+          legend: {data: ["中债财富指数", "信号score（右轴）"], bottom: 0, textStyle: {fontSize: 11}},
+          grid: {top: 30, left: 8, right: 8, bottom: 26, containLabel: true},
+          xAxis: {type: "category", data: mo.map(x => x.m), axisLabel: {fontSize: 10, hideOverlap: true}},
+          yAxis: [
+            {type: "value", name: "指数", scale: true, axisLabel: {fontSize: 10}},
+            {type: "value", name: "score", min: -3.5, max: 3.5, interval: 1,
+             axisLabel: {fontSize: 10}, splitLine: {show: false}},
+          ],
+          series: [
+            {name: "中债财富指数", type: "line", data: mo.map(x => x.i), symbol: "none",
+             lineStyle: {width: 2, color: "#3b6ea5"}, itemStyle: {color: "#3b6ea5"}, z: 3,
+             markPoint: {data: marks, animation: false}},
+            {name: "信号score（右轴）", type: "bar", yAxisIndex: 1, barWidth: "60%", z: 2,
+             data: mo.map(x => ({value: x.s,
+               itemStyle: {color: C_SIG[x.g] || "#8a8f98", opacity: x.g === "中性" ? 0.55 : 0.95}}))},
+          ],
+        });
+      };
+      const overlay = h("div", {}, [
         h("div", {style: {fontSize: "13px", fontWeight: 600, color: "var(--muted)", margin: "4px 0 6px"}},
-          ["信号时间线 · 全 " + tl.length + " 月（柱高=|score|，↑正分/↓负分，色=信号）"]),
-        h("div", {style: {display: "flex", alignItems: "center", gap: "1px", height: "44px",
-          overflowX: "auto", overflowY: "hidden", position: "relative",
-          borderTop: "1px solid var(--border, #e3e5e8)", borderBottom: "1px solid var(--border, #e3e5e8)"}},
-          [h("div", {style: {position: "absolute", left: 0, right: 0, top: HALF + "px", height: "1px",
-            background: "var(--border, #e3e5e8)", pointerEvents: "none"}}), ...bars]),
-        h("div", {style: {display: "flex", justifyContent: "space-between", fontSize: "11px",
-          color: "var(--muted)", marginTop: "2px"}},
-          [tl[0].month, tl[tl.length - 1].month]),
-      ]) : h("div", {class: "empty"}, ["无历史"]);
+          ["信号 vs 中债财富指数 · " + ((bt && bt.monthly) || []).length +
+            " 月（柱=score·右轴，线=指数，◆=拐点）"]),
+        chartBox,
+      ]);
+
+      /* —— 历史胜率统计 —— */
+      let winrate = null;
+      if (bt && bt.n) {
+        const pos = bt.pos || {}, neg = bt.neg || {};
+        const cell = (label, val, sub, color) => h("div", {style: {
+          border: "1px solid var(--border, #e3e5e8)", borderRadius: "6px", padding: "8px 10px",
+          minWidth: "160px", background: "var(--card, #fff)", textAlign: "center"}}, [
+          h("div", {style: {fontSize: "11px", color: "var(--muted)"}}, [label]),
+          h("div", {style: {fontSize: "20px", fontWeight: 800,
+            color: color || "var(--text, #222)", fontVariantNumeric: "tabular-nums"}}, [val]),
+          h("div", {style: {fontSize: "11px", color: "var(--muted)"}}, [sub]),
+        ]);
+        const negHit = neg.upRate != null ? (1 - neg.upRate) : null;
+        winrate = h("div", {style: {marginTop: "12px"}}, [
+          h("div", {style: {fontSize: "13px", fontWeight: 600, color: "var(--muted)", margin: "4px 0 6px"}},
+            ["历史胜率 · 基准 " + (bt.benchmark || "中债财富指数") + "（次月总回报）"]),
+          h("div", {style: {display: "flex", flexWrap: "wrap", gap: "8px"}}, [
+            cell("方向综合命中", (bt.hitRate * 100).toFixed(1) + "%", "n=" + bt.n + " 月"),
+            cell("偏多月(score>0) 次月上涨", pos.upRate != null ? (pos.upRate * 100).toFixed(1) + "%" : "—",
+              "n=" + (pos.n || 0) + " · 月均 +" + (pos.avg != null ? pos.avg.toFixed(2) : "—") + "%",
+              "#1f8a5f"),
+            cell("偏空月(score<0) 次月下跌", negHit != null ? (negHit * 100).toFixed(1) + "%" : "—",
+              "n=" + (neg.n || 0) + " · 月均 +" + (neg.avg != null ? neg.avg.toFixed(2) : "—") + "%",
+              "#c24135"),
+          ]),
+          h("div", {style: {fontSize: "11px", color: "var(--muted)", marginTop: "6px", lineHeight: 1.6}}, [
+            "积极 / 风险 历史样本仅 " + ((hist.filter(x => x.signal === "积极").length) || 0) + " / " +
+            ((hist.filter(x => x.signal === "风险").length) || 0) + " 月，信号级胜率无统计意义；" +
+            "偏空月债券仍多数上涨（2012-15 利率下行长周期），score 宜作相对强弱参考而非做空依据。",
+          ]),
+        ]);
+      }
 
       /* —— 信号分布 —— */
       const dist = {};
@@ -304,29 +394,290 @@ PANELS["quant"] = {
       const distTxt = ["积极", "中性", "风险"].map(s =>
         (dist[s] || 0) + " " + s).join(" · ");
 
-      return h("section", {class: "card", id: "quant-signal"}, [
-        h("h3", {class: "card-title"}, ["债券择时信号 · 马尔可夫"]),
-        App.badge("本地近似 · 非官方口径", sig.asOf),
-        bigSig,
-        chipsRow,
-        timeline,
-        h("p", {style: {fontSize: "11px", color: "var(--muted)", marginTop: "10px", lineHeight: 1.6}}, [
-          sig.method || "",
-          "；窗口 " + (sig.window || "?") + "（" + (sig.nMonths || 0) + " 月）；历史分布 " + distTxt + "。",
-          " 三因子各 ±1（parity → score∈{−3,−1,+1,+3}），±2 阈值实需三因子高度同向。",
+      return {
+        card: h("section", {class: "card", id: "quant-signal"}, [
+          h("h3", {class: "card-title"}, ["债券择时信号 · 马尔可夫"]),
+          App.badge("本地近似 · 非官方口径", sig.asOf),
+          guide,
+          bigSig,
+          usage,
+          chipsRow,
+          overlay,
+          ...(winrate ? [winrate] : []),
+          h("p", {style: {fontSize: "11px", color: "var(--muted)", marginTop: "10px", lineHeight: 1.6}}, [
+            sig.method || "",
+            "；窗口 " + (sig.window || "?") + "（" + (sig.nMonths || 0) + " 月）；历史分布 " + distTxt + "。",
+            " 三因子各 ±1（parity → score∈{−3,−1,+1,+3}），±2 阈值实需三因子高度同向。",
+          ]),
+        ]),
+        draw: drawOverlay,
+      };
+    }
+
+    /* ============ 信用债三因子择券轮动卡 ============ */
+    function cardCredit() {
+      const L = cr.latest || {};
+      const bt = cr.backtest || {};
+      const at5 = bt.at5bp || {};
+      const cs = bt.costSensitivity || {};
+      const ann = bt.annual || [];
+      const nav = bt.nav || [];
+
+      /* —— 策略原理（卡顶）—— */
+      const guide = h("div", {style: {border: "1px solid var(--border, #e3e5e8)", borderRadius: "6px",
+        padding: "8px 12px", marginBottom: "12px", fontSize: "12px", lineHeight: 1.7,
+        color: "var(--muted)", background: "var(--bg-soft, #f5f6f8)"}}, [
+        h("div", {style: {fontWeight: 700, color: "var(--text, #222)", marginBottom: "2px"}},
+          ["📖 策略原理与依据"]),
+        h("div", {}, [h("b", {}, ["三因子："]), "期限因子（各品种 3Y−1Y / 5Y−3Y / 7Y−5Y 段期限利差）、"
+          + "信用因子（品种收益率 − 同期限国开债利差）、比价因子（同期限品种两两相对利差），"
+          + "各做 240 日滚动 z-score——z 越高 = 相对自身历史越便宜。"]),
+        h("div", {}, [h("b", {}, ["合成："]), "三因子各自在 16 条曲线池内排名（rank 1 = 最优），排名等权合成评分（低 = 优）。"]),
+        h("div", {}, [h("b", {}, ["依据："]), "信用利差存在均值回归——买「最便宜」的一批，赚利差收敛 + 票息；"
+          + "无静态利差中枢，z-score 自适应不同利差水位。"]),
+        h("div", {}, [h("b", {}, ["池："]), "二级资本债 / 银行永续债 / 中短票 / 城投债 × 1/3/5/7Y 共 16 条中债信用曲线"
+          + "（银行永续债 7Y 无现券，不入选）。"]),
+        h("div", {}, [h("b", {}, ["粘性规则："]), "等权持有评分前 3；成员跌出 top-5 才被替换（年换仓约 10 次），避免追排名高换手。"]),
+      ]);
+
+      /* —— 最新信号（大字 + 持仓 chips + 换仓指令）—— */
+      const holdChips = (L.holdings || []).map(k =>
+        h("span", {style: {display: "inline-block", padding: "6px 12px", borderRadius: "6px",
+          background: "var(--bg-soft, #f5f6f8)", border: "1px solid var(--border, #e3e5e8)",
+          fontSize: "16px", fontWeight: 700, color: "#0f3a5f"}}, [k]));
+      const chg = L.changes || [];
+      const chgNode = chg.length
+        ? h("span", {style: {fontSize: "14px", fontWeight: 700, color: "#b07818"}},
+            [chg.map(c => (c[0] === "+" ? "＋" : "−") + c.slice(1)).join("　")])
+        : h("span", {style: {fontSize: "13px", color: "var(--muted)"}}, ["无（成员仍在位，不动仓）"]);
+      const latest = h("div", {style: {padding: "10px 12px", borderRadius: "6px",
+        background: "var(--bg-soft, #f5f6f8)", marginBottom: "12px"}}, [
+        h("div", {style: {display: "flex", alignItems: "baseline", gap: "12px", flexWrap: "wrap"}}, [
+          h("span", {style: {fontSize: "12px", color: "var(--muted)"}}, [L.date + " 最新信号"]),
+          h("span", {style: {fontSize: "12px", color: "var(--muted)"}}, ["等权 1/3 持有："]),
+          ...holdChips,
+        ]),
+        h("div", {style: {display: "flex", alignItems: "baseline", gap: "12px", flexWrap: "wrap",
+          marginTop: "8px"}}, [
+          h("span", {style: {fontSize: "12px", color: "var(--muted)"}}, ["较上期（" + (L.prevDate || "?") + "）变动："]),
+          chgNode,
+        ]),
+        h("div", {style: {fontSize: "12px", color: "var(--muted)", marginTop: "4px"}},
+          ["上期持有：" + ((L.prevHoldings || []).join(" + ") || "—")]),
+        h("div", {style: {display: "flex", gap: "16px", flexWrap: "wrap", marginTop: "6px",
+          fontSize: "12px", fontVariantNumeric: "tabular-nums"}}, [
+          h("span", {}, [h("b", {}, ["组合久期 "]), App.fmt(L.duration, 1) + "Y"]),
+          h("span", {}, [h("b", {}, ["持仓 YTM "]), App.fmt(L.ytm, 2) + "%"]),
+          h("span", {style: {color: "var(--muted)"}}, ["（16 曲线池均值 " + App.fmt(L.poolYtm, 2) + "%）"]),
         ]),
       ]);
+
+      /* —— top-5 候选 + 防御 + 7Y 段 z —— */
+      const t5 = L.top5 || [];
+      const t5rows = t5.map((r, i) => h("tr", {}, [
+        h("td", {style: {padding: "3px 8px", textAlign: "right", color: "var(--muted)"}}, [String(i + 1)]),
+        h("td", {style: {padding: "3px 8px", fontWeight: r.held ? 700 : 400,
+          color: r.held ? "#0f3a5f" : "var(--text, #222)"}}, [r.key + (r.held ? " ●持有" : "")]),
+        h("td", {style: {padding: "3px 8px", textAlign: "right", fontVariantNumeric: "tabular-nums"}},
+          [App.fmt(r.score, 2)]),
+        h("td", {style: {padding: "3px 8px", textAlign: "right",
+          color: "var(--muted)", fontVariantNumeric: "tabular-nums"}}, ["≈" + r.rank]),
+      ]));
+      const defTxt = (L.defensive || []).length
+        ? (L.defensive || []).join("、") + "（三段期限利差 z 全 < −1 → 该品种 1Y 排名置首防守）"
+        : "无";
+      const seg7 = (L.seg7z || []).map(x => x.v + " " + (x.z >= 0 ? "+" : "") + App.fmt(x.z, 2)).join(" · ");
+      const candBox = h("div", {style: {display: "flex", gap: "12px", flexWrap: "wrap",
+        marginBottom: "12px", alignItems: "flex-start"}}, [
+        h("div", {style: {flex: "1 1 280px", minWidth: "260px"}}, [
+          h("div", {style: {fontSize: "13px", fontWeight: 600, color: "var(--muted)", margin: "4px 0 6px"}},
+            ["top-5 候选（评分低 = 优；括号 ≈ 合成排名）"]),
+          h("table", {style: {width: "100%", borderCollapse: "collapse", fontSize: "12px"}}, [
+            h("thead", {}, [h("tr", {style: {color: "var(--muted)", fontSize: "11px"}}, [
+              h("td", {style: {padding: "2px 8px"}}, ["#"]),
+              h("td", {style: {padding: "2px 8px"}}, ["曲线"]),
+              h("td", {style: {padding: "2px 8px", textAlign: "right"}}, ["评分"]),
+              h("td", {style: {padding: "2px 8px", textAlign: "right"}}, ["rank"]),
+            ])]),
+            h("tbody", {}, t5rows),
+          ]),
+          h("div", {style: {fontSize: "11px", color: "var(--muted)", marginTop: "4px", lineHeight: 1.6}}, [
+            h("b", {}, ["防御触发："]), defTxt, h("br"),
+            h("b", {}, ["各品种 7Y 段 z："]), seg7,
+          ]),
+        ]),
+      ]);
+
+      /* —— 如何使用 —— */
+      const usage = h("div", {style: {border: "1px solid var(--border, #e3e5e8)", borderRadius: "6px",
+        padding: "8px 12px", marginBottom: "12px", fontSize: "12px", lineHeight: 1.7,
+        color: "var(--muted)"}}, [
+        h("div", {style: {fontWeight: 700, color: "var(--text, #222)", marginBottom: "2px"}}, ["🧭 如何使用"]),
+        h("div", {}, [h("b", {}, ["执行："]), "周五收盘后信号 → 下一交易日（T+1）按等权 1/3 建仓/调仓；"
+          + "无变动则不动仓。周频运行，随周五数据刷新。"]),
+        h("div", {}, [h("b", {}, ["风控："]), "组合久期 ≤ 5Y；组合回撤触及 −4% 硬减仓。"]),
+        h("div", {}, [h("b", {}, ["成本："]), "单次换仓成本 5~15bp 区间策略仍有效（见下方敏感性）；"
+          + "真实成本更高时需进一步降频。"]),
+        h("div", {}, [h("b", {}, ["局限："]), "低利率 + 利差低分位环境（如 2025）超额明显收敛（见分年表）；"
+          + "利差单边走扩期均值回归因子会持续受伤，配合防御触发与回撤风控使用。"]),
+      ]);
+
+      /* —— 三因子 chips —— */
+      const fchips = (L.factors || []).map(f =>
+        h("div", {style: {border: "1px solid var(--border, #e3e5e8)", borderRadius: "6px",
+          padding: "8px 10px", minWidth: "220px", background: "var(--card, #fff)"}}, [
+          h("div", {style: {display: "flex", justifyContent: "space-between", alignItems: "center"}}, [
+            h("span", {style: {fontWeight: 600}}, [f.name]),
+            h("span", {style: {fontSize: "12px", color: "#0f3a5f", fontWeight: 700,
+              fontVariantNumeric: "tabular-nums"}}, ["z " + (f.z >= 0 ? "+" : "") + App.fmt(f.z, 2)]),
+          ]),
+          h("div", {style: {fontSize: "12px", marginTop: "4px"}}, [
+            "当前最优：", h("b", {}, [f.best])]),
+          h("div", {style: {fontSize: "11px", color: "var(--muted)", marginTop: "2px", lineHeight: 1.5}},
+            [f.desc]),
+        ]));
+      const fchipsRow = h("div", {style: {display: "flex", flexWrap: "wrap", gap: "8px",
+        marginBottom: "12px"}}, fchips);
+
+      /* —— 净值曲线（挂载后绘制）—— */
+      const chartBox = h("div", {style: {height: "250px", width: "100%"}});
+      const drawNav = () => {
+        if (!nav.length) {
+          chartBox.append(h("div", {class: "empty"}, ["暂无回测净值数据"]));
+          return;
+        }
+        const hasIx = nav.some(x => x.i != null);
+        Charts.custom(chartBox, {
+          tooltip: {trigger: "axis", axisPointer: {type: "line"},
+            formatter: ps => {
+              const x = ps[0] && ps[0].axisValue;
+              const row = nav.find(v => v.d === x);
+              if (!row) return "";
+              return [x,
+                "策略@5bp " + App.fmt(row.s, 3),
+                "16曲线等权 " + App.fmt(row.e, 3),
+                row.i != null ? "信用债指数 " + App.fmt(row.i, 3) : null,
+              ].filter(Boolean).join("<br>");
+            }},
+          legend: {data: ["策略@5bp", "16曲线等权", "信用债指数(参照)"], bottom: 0, textStyle: {fontSize: 11}},
+          grid: {top: 30, left: 8, right: 8, bottom: 26, containLabel: true},
+          xAxis: {type: "category", data: nav.map(x => x.d), axisLabel: {fontSize: 10, hideOverlap: true}},
+          yAxis: {type: "value", scale: true, axisLabel: {fontSize: 10}},
+          series: [
+            {name: "策略@5bp", type: "line", data: nav.map(x => x.s), symbol: "none",
+             lineStyle: {width: 2, color: "#0f3a5f"}, itemStyle: {color: "#0f3a5f"}, z: 3},
+            {name: "16曲线等权", type: "line", data: nav.map(x => x.e), symbol: "none",
+             lineStyle: {width: 1.5, color: "#b8860b"}, itemStyle: {color: "#b8860b"}, z: 2},
+            ...(hasIx ? [{name: "信用债指数(参照)", type: "line", data: nav.map(x => x.i),
+             symbol: "none", connectNulls: false, z: 2,
+             lineStyle: {width: 1.2, color: "#d62728", type: "dashed"},
+             itemStyle: {color: "#d62728"}}] : []),
+          ],
+        });
+      };
+      const navBlock = h("div", {}, [
+        h("div", {style: {fontSize: "13px", fontWeight: 600, color: "var(--muted)", margin: "4px 0 6px"}},
+          ["周频净值 · " + (bt.window || "?") + "（" + (bt.nWeeks || nav.length) + " 周）"]),
+        chartBox,
+        ...(bt.ixNote ? [h("div", {style: {fontSize: "11px", color: "var(--muted)", marginTop: "4px"}},
+          ["＊ " + bt.ixNote])] : []),
+      ]);
+
+      /* —— 绩效统计 —— */
+      const cell = (label, val, sub, color) => h("div", {style: {
+        border: "1px solid var(--border, #e3e5e8)", borderRadius: "6px", padding: "8px 10px",
+        minWidth: "140px", background: "var(--card, #fff)", textAlign: "center"}}, [
+        h("div", {style: {fontSize: "11px", color: "var(--muted)"}}, [label]),
+        h("div", {style: {fontSize: "19px", fontWeight: 800,
+          color: color || "var(--text, #222)", fontVariantNumeric: "tabular-nums"}}, [val]),
+        h("div", {style: {fontSize: "11px", color: "var(--muted)"}}, [sub]),
+      ]);
+      const csCells = [1, 5, 10, 15].map(bp => {
+        const d = cs[String(bp)] || {};
+        return cell("成本 " + bp + "bp/次", App.fmt(d.cumPct, 1) + "%",
+          "MDD " + App.fmt(d.mddPct, 2) + "%", bp === 5 ? "#0f3a5f" : null);
+      });
+      const at5Cells = [
+        cell("累计收益 @5bp", App.fmt(at5.cumPct, 1) + "%", "等权16曲线 " + App.fmt(at5.ewCumPct, 1) + "%", "#1f8a5f"),
+        cell("年化 @5bp", App.fmt(at5.annPct, 1) + "%", (bt.nWeeks || "?") + " 周复利"),
+        cell("最大回撤", App.fmt(at5.mddPct, 2) + "%", "周频口径"),
+        cell("周度胜率", at5.winPosWeek != null ? (at5.winPosWeek * 100).toFixed(0) + "%" : "—", "收益为正周占比"),
+        cell("跑赢等权周占比", at5.winVsEw != null ? (at5.winVsEw * 100).toFixed(1) + "%" : "—",
+          "周均超额 " + (at5.excessBp != null ? "+" + at5.excessBp.toFixed(1) : "—") + "bp"),
+      ];
+      /* 分年表 */
+      const annRows = ann.map(a => h("tr", {}, [
+        h("td", {style: {padding: "3px 10px", fontWeight: 600}}, [String(a.year)]),
+        h("td", {style: {padding: "3px 10px", textAlign: "right", fontVariantNumeric: "tabular-nums",
+          color: "#0f3a5f", fontWeight: 700}}, [App.fmt(a.retPct, 2) + "%"]),
+        h("td", {style: {padding: "3px 10px", textAlign: "right",
+          color: "var(--muted)", fontVariantNumeric: "tabular-nums"}}, [App.fmt(a.ewPct, 2) + "%"]),
+        h("td", {style: {padding: "3px 10px", textAlign: "right",
+          color: (a.retPct - a.ewPct) >= 0 ? "#1f8a5f" : "#c24135",
+          fontVariantNumeric: "tabular-nums"}},
+          [(a.retPct - a.ewPct >= 0 ? "+" : "") + (a.retPct - a.ewPct).toFixed(2) + "%"]),
+        h("td", {style: {padding: "3px 10px", textAlign: "right",
+          color: "var(--muted)", fontVariantNumeric: "tabular-nums"}}, [App.fmt(a.mddPct, 2) + "%"]),
+      ]));
+      const annTable = ann.length ? h("div", {style: {marginTop: "12px"}}, [
+        h("div", {style: {fontSize: "13px", fontWeight: 600, color: "var(--muted)", margin: "4px 0 6px"}},
+          ["分年表现 @5bp（vs 16 曲线等权）"]),
+        h("table", {style: {borderCollapse: "collapse", fontSize: "12px"}}, [
+          h("thead", {}, [h("tr", {style: {color: "var(--muted)", fontSize: "11px"}}, [
+            h("td", {style: {padding: "2px 10px"}}, ["年份"]),
+            h("td", {style: {padding: "2px 10px", textAlign: "right"}}, ["策略"]),
+            h("td", {style: {padding: "2px 10px", textAlign: "right"}}, ["等权"]),
+            h("td", {style: {padding: "2px 10px", textAlign: "right"}}, ["超额"]),
+            h("td", {style: {padding: "2px 10px", textAlign: "right"}}, ["MDD"]),
+          ])]),
+          h("tbody", {}, annRows),
+        ]),
+      ]) : null;
+
+      return {
+        card: h("section", {class: "card", id: "quant-credit"}, [
+          h("h3", {class: "card-title"}, ["信用债三因子择券轮动 · 均值回归"]),
+          App.badge("周频 · 本地重算", cr.asOf),
+          guide,
+          latest,
+          candBox,
+          usage,
+          fchipsRow,
+          navBlock,
+          h("div", {style: {marginTop: "12px"}}, [
+            h("div", {style: {fontSize: "13px", fontWeight: 600, color: "var(--muted)", margin: "4px 0 6px"}},
+              ["成本敏感性（单次换仓成本 · 全区间累计 / MDD）"]),
+            h("div", {style: {display: "flex", flexWrap: "wrap", gap: "8px"}}, csCells),
+            h("div", {style: {display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "8px"}}, at5Cells),
+          ]),
+          ...(annTable ? [annTable] : []),
+          h("p", {style: {fontSize: "11px", color: "var(--muted)", marginTop: "10px", lineHeight: 1.6}}, [
+            cr.method || "",
+            "；窗口 " + (cr.window || bt.window || "?") + "，年换仓 " + App.fmt(bt.switchesPerYear, 1) + " 次。",
+          ]),
+        ]),
+        draw: drawNav,
+      };
     }
 
     /* —— 挂载 —— */
     root.append(Export.btn("quant"));
-    if (!sig) {
+    if (!sig && !cr) {
       root.append(h("section", {class: "card"}, [
         h("div", {class: "empty"}, ["暂无量化信号——跑 python scripts/update.py --only quant 并 build 刷新"]),
       ]));
       return;
     }
-    if (sig) root.append(cardSignal());
+    if (sig) {
+      const built = cardSignal();
+      root.append(built.card);
+      built.draw();  // echarts.init 需容器已在文档中取到非零宽高，挂载后再绘制
+    }
+    if (cr) {
+      const built2 = cardCredit();
+      root.append(built2.card);
+      built2.draw();
+    }
   },
 };
 </script>
