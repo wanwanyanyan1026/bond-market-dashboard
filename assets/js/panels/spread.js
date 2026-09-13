@@ -4,16 +4,16 @@
      ⓪ 利差追踪-全部（页面最顶）——8 品种勾选 chips 同刷 2×2
         （YTM3Y / 期限3Y-1Y / 品种3Y / 等级3Y），至少保留 1 品种；
         .chip 无 on/off 底样式 → onclick 同步切 opacity 灰显勾选态
-     ① 周度快照表——45 行按段拆 5 表（利率债 14：收益率 % +
-        期限利差 bp / 银行资本债 8 / 中票 11 / 等级利差 2 /
-        资本债-中票 10），
+     ① 周度快照表——按段拆 6 表（利率债：收益率 % + 期限利差 bp /
+        银行资本债 AAA-/AA+/AA×1~10Y / 中票 AAA~AA×1~10Y /
+        城投债 AAA~AA-×1/3/5Y / 等级利差 / 资本债-中票），
         变动列正=红 .up / 负=绿 .down / 零 .flat（assets.js 表格
         涨跌色后处理惯例），一律 bp；3年分位列（滚动 3 年窗口百分位）
      ②' 品种利差明细——8 品种 tab × 2×2（YTM 分期限 / 期限利差 /
         品种利差分期限 / 等级利差），单卡重绘切品种（替代原中票
         评级 tab 卡，T5）
-     ② 银行资本债——8 线（二级/永续 × 1/3/5/7Y）vs 国开；8 线当前值
-        过密 → 副标题不逐一列举，指回「见上方快照表」（详单在 tooltip）
+     ② 银行资本债——评级档 tab（AAA-/AA+/AA），每档 二级/永续 × 1/3/5/7/10Y
+        vs 国开；当前值过密 → 副标题指回「见上方快照表」（详单在 tooltip）
    消费：App.h / App.fmt / App.badge（app.js）、Charts.line / table（charts.js）
    ============================================================ */
 PANELS["spread"] = {
@@ -32,11 +32,12 @@ PANELS["spread"] = {
     const BADGE = "财汇中债曲线 · 二级2018-12起 永续约2021起 · 基准统一vs国开";
 
     /* —— 变动总览卡：水平发散条形图，时间范围可选 1周/1月/3月/半年/1年 —— */
-    const GROUP_ORDER = ["bank", "mtn", "grade", "bankmtn"];
+    const GROUP_ORDER = ["bank", "mtn", "chengtou", "grade", "bankmtn"];
     const GROUP_LABEL = {bank: "银行资本债信用利差", mtn: "中票信用利差",
+                         chengtou: "城投债信用利差",
                          grade: "等级利差", bankmtn: "资本债-中票品种利差"};
     const RANGES = [["1周", 0], ["1月", 30], ["3月", 90], ["半年", 182], ["1年", 365]];
-    // 收集 31 条信用利差序列（bank+mtn+grade+bankmtn），保留 src 引用
+    // 收集全部信用利差序列（bank+mtn+chengtou+grade+bankmtn），保留 src 引用
     const chgItems = Object.values(seriesMap)
       .filter(s => s && GROUP_ORDER.includes(s.group))
       .sort((a, b) => GROUP_ORDER.indexOf(a.group) - GROUP_ORDER.indexOf(b.group)
@@ -83,7 +84,9 @@ PANELS["spread"] = {
       return {names, vals};
     }
 
-    const chgBox = h("div", {id: "spread-chg-chart", class: "chart", style: {height: "500px"}});
+    // 条形数随评级×期限扩展 → 高度按条数自适应（每条 22px）
+    const chgBox = h("div", {id: "spread-chg-chart", class: "chart",
+      style: {height: Math.max(500, 22 * (chgItems.length + GROUP_ORDER.length) + 40) + "px"}});
     const chgTabs = h("div", {class: "tabs"}, RANGES.map(([label], i) =>
       h("button", {class: "tab" + (i === 0 ? " active" : ""), "data-ri": i,
         onclick: () => drawChg(i)}, [label])));
@@ -183,12 +186,12 @@ PANELS["spread"] = {
 
     /* —— ① 周度快照表：35 行按段拆 4 张表（Charts.table 纯 DOM，构建期即可画）—— */
     const seg = (n) => n.startsWith("商业银行") ? 1 : n.startsWith("中票") ? 2
-      : n.startsWith("等级利差") ? 3
+      : n.startsWith("城投债") ? 3 : n.startsWith("等级利差") ? 4
       : n.startsWith("二级资本债-中票") || n.startsWith("永续债-中票")
-        || n.startsWith("银行永续债-中票") ? 4 : 0;
+        || n.startsWith("银行永续债-中票") ? 5 : 0;
     const SEG_TITLES = ["利率债收益率与期限利差", "银行资本债信用利差（vs 国开）",
-                        "中票信用利差（vs 国开）", "等级利差（中票）",
-                        "银行资本债-中票品种利差（同等级同期限）"];
+                        "中票信用利差（vs 国开）", "城投债信用利差（vs 国开）",
+                        "等级利差（中票）", "银行资本债-中票品种利差（同等级同期限）"];
     const snapTables = snap.rows.length ? SEG_TITLES.map((t, gi) => {
       const rows = snap.rows.filter((r) => seg(r.name) === gi);
       const box = h("div", {id: "spread-snap-table-" + gi});
@@ -219,7 +222,7 @@ PANELS["spread"] = {
       snapTables ? snapTables : h("div", {class: "empty"}, ["利差快照数据待接入（python scripts/update.py --only spread）"]),
     ]);
 
-    /* —— ② 银行资本债：8 线（二级/永续 × 1/3/5/7Y），副标题见快照表不逐一列举 —— */
+    /* —— ② 银行资本债：评级档 tab，每档 二级/永续 × 1/3/5/7/10Y —— */
     const pick = (s) => (s && Array.isArray(s.dates) && s.dates.length && has(s.values))
       ? {name: s.label, dates: s.dates, values: s.values, src: s} : null;
     const bankSeries = Object.values(seriesMap).map(pick).filter(Boolean)
@@ -233,31 +236,43 @@ PANELS["spread"] = {
       startOf(bankSeries, "商业银行永续债") ? "永续债 " + startOf(bankSeries, "商业银行永续债") + " 起" : "",
     ].filter(Boolean).join(" / ");
     const bankBox = h("div", {id: "spread-bank-chart", class: "chart"});
+    const BANK_TIERS = ["AAA-", "AA+", "AA"];
+    const bankTabs = h("div", {class: "tabs"}, BANK_TIERS.map(t =>
+      h("button", {class: "tab", "data-t": t, onclick: () => drawBank(t)}, [t + " 档"])));
+    function drawBank(t) {
+      bankTabs.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.t === t));
+      Charts.line(bankBox, {series: bankSeries.filter((s) => s.name.includes(" " + t + " ")),
+        yUnit: "bp", range: "3Y"});
+    }
     const bankCard = h("section", {class: "card", id: "spread-bank-card"}, [
       h("h3", {class: "card-title"}, ["银行资本债信用利差（vs 国开）"]),
       App.badge(BADGE, fetchedAt),
       h("p", {class: "card-sub"}, [bankSeries.length
         ? "截至 " + snap.asOf + (bankStarts ? " · " + bankStarts : "")
-          + " · " + bankSeries.length + " 线 · 当前值/变动/3年分位见上方快照表（详单在 tooltip）"
+          + " · 评级档 tab 切换（每档 二级/永续 × 1/3/5/7/10Y）· 当前值/变动/3年分位见上方快照表（详单在 tooltip）"
         : "银行资本债利差序列待接入"]),
-      bankSeries.length ? bankBox : h("div", {class: "empty"}, ["银行资本债利差序列待接入"]),
+      bankSeries.length ? [bankTabs, bankBox] : h("div", {class: "empty"}, ["银行资本债利差序列待接入"]),
     ]);
 
-    /* —— ③ 银行资本债-中票品种利差（bankmtn 组 10 线，同等级同期限）—— */
+    /* —— ③ 银行资本债-中票品种利差（同等级同期限，评级档 tab）—— */
     const mtnSeries = Object.values(seriesMap).map(pick).filter(Boolean)
       .filter((s) => s.src.group === "bankmtn");
     const mtnBox = h("div", {id: "spread-bankmtn-chart", class: "chart"});
+    const mtnTabs = h("div", {class: "tabs"}, BANK_TIERS.map(t =>
+      h("button", {class: "tab", "data-t": t, onclick: () => drawBankmtn(t)}, [t + " 档"])));
+    function drawBankmtn(t) {
+      mtnTabs.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.t === t));
+      Charts.line(mtnBox, {series: mtnSeries.filter((s) => s.name.includes(" " + t + " ")),
+        yUnit: "bp", range: "1Y"});
+    }
     const bankmtnCard = h("section", {class: "card", id: "spread-bankmtn-card"}, [
       h("h3", {class: "card-title"}, ["银行资本债-中票品种利差（同等级同期限）"]),
       App.badge("财汇中债曲线 · 资本债 减 同档中票", fetchedAt),
       h("p", {class: "card-sub"}, [mtnSeries.length
-        ? "截至 " + snap.asOf + " · " + mtnSeries.length + " 线 · " + (() => {
-        const a = mtnSeries.find(s => s.name.includes("AAA-") && s.name.includes("1Y"));
-        return "AAA- 档 1/3/5/7Y" + (a ? "（" + a.dates[0] + " 起）" : "") + " × 二级/永续 + AA+ 档 3Y × 二级/银行永续（财汇 AA+ 资本债曲线仅 3Y）";
-      })()
+        ? "截至 " + snap.asOf + " · " + mtnSeries.length + " 线 · 评级档 tab 切换（AAA- 档 二级/永续、AA+/AA 档 二级/银行永续 × 1/3/5/7/10Y）"
           + " · 当前值/变动/3年分位见上方快照表（详单在 tooltip）"
         : "资本债-中票品种利差序列待接入"]),
-      mtnSeries.length ? mtnBox : h("div", {class: "empty"}, ["资本债-中票品种利差序列待接入"]),
+      mtnSeries.length ? [mtnTabs, mtnBox] : h("div", {class: "empty"}, ["资本债-中票品种利差序列待接入"]),
     ]);
 
     /* —— ②' 品种利差明细：8 品种 tab × 2×2（YTM 分期限 / 期限利差 / 品种利差 / 等级利差）—— */
@@ -305,7 +320,7 @@ PANELS["spread"] = {
 
     if (chgItems.length) { drawChg(0); }
     if (variety.length) { redrawAll(); drawDetail(variety[0].name); }
-    if (bankSeries.length) Charts.line(bankBox, {series: bankSeries, yUnit: "bp", range: "3Y"});
-    if (mtnSeries.length) Charts.line(mtnBox, {series: mtnSeries, yUnit: "bp", range: "1Y"});
+    if (bankSeries.length) drawBank("AAA-");
+    if (mtnSeries.length) drawBankmtn("AAA-");
   },
 };

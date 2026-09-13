@@ -19,7 +19,7 @@ PANELS["credit"] = {
     const STANCES = ["偏正面", "中性", "偏负面", "其他"];
     const COLOR = {"偏正面": "#1f8a5f", "中性": "#8a8f98", "偏负面": "#c24135", "其他": "#b8a26b"};
     const PAGE_SIZE = 10;
-    const state = {stance: "", from: "", to: "", kw: "", page: 1};
+    const state = {stance: "", from: "", to: "", kw: "", page: 1, order: "desc"};
 
     const cnt = {"偏正面": 0, "中性": 0, "偏负面": 0, "其他": 0};
     items.forEach(it => { if (cnt[it.stance] !== undefined) cnt[it.stance]++; });
@@ -33,6 +33,9 @@ PANELS["credit"] = {
     const kwIn = h("input", {type: "text", placeholder: "关键词搜索（摘要/分析/主体等全字段）",
       style: {width: "280px"},
       oninput: () => { state.kw = kwIn.value.trim(); state.page = 1; apply(); }});
+    const orderBtn = h("button", {class: "chip", style: {cursor: "pointer"},
+      onclick: () => { state.order = state.order === "desc" ? "asc" : "desc"; state.page = 1; apply(); }},
+      ["时间倒序 ▼"]);
     const countNote = h("span", {style: {fontSize: "12px", color: "var(--muted)"}}, [""]);
     const body = h("div", {id: "credit-tbl"});
     const pager = h("div", {style: {display: "flex", justifyContent: "center", alignItems: "center", gap: "8px", marginTop: "10px"}});
@@ -123,6 +126,10 @@ PANELS["credit"] = {
 
     function apply() {
       const rows = visible();
+      rows.sort((a, b) => state.order === "desc"
+        ? String(b.date).localeCompare(String(a.date))
+        : String(a.date).localeCompare(String(b.date)));
+      orderBtn.textContent = state.order === "desc" ? "时间倒序 ▼" : "时间正序 ▲";
       chips.forEach(b => {
         const on = b.dataset.stance === state.stance;
         b.style.borderColor = on ? COLOR[b.dataset.stance] : "";
@@ -141,7 +148,7 @@ PANELS["credit"] = {
         h("div", {style: {display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center", margin: "10px 0"}},
           [...chips, countNote]),
         h("div", {style: {display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", margin: "0 0 10px"}},
-          [fromIn, "—", toIn, kwIn]),
+          [fromIn, "—", toIn, kwIn, orderBtn]),
         body,
         pager,
       ] : h("div", {class: "empty"},

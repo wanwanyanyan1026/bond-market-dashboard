@@ -45,6 +45,15 @@ const App = {
     root.innerHTML = "";
     window.scrollTo(0, 0);
     PANELS[id].render(root);
+    this.asOf(id);   // 右上角随面板显示该模块数据截止日
+  },
+
+  /* 右上角数据日期：当前面板模块 asOf，无（如 home 聚合页/JSON 模块）回退全局 */
+  asOf(id) {
+    const mm = (DATA.meta && DATA.meta.modules) || {};
+    const d = (mm[id] && mm[id].asOf) || (DATA.meta && DATA.meta.asOf) || "";
+    const el = document.getElementById("sidebar-foot");
+    if (el) el.textContent = d ? "数据更新于 " + d : "";
   },
 
   /* 数据源角标："来源 · 更新时间" muted 小字，配合 .card 相对定位在右上角 */
