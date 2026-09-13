@@ -6,7 +6,8 @@
         .chip 无 on/off 底样式 → onclick 同步切 opacity 灰显勾选态
      ① 周度快照表——左右两栏（左：利率债收益率%+期限利差bp / 银行资本债
         AAA-/AA+/AA×1~10Y / 中票 AAA~AA×1~10Y / 城投债 AAA~AA-×1/3/5Y，
-        右：资本债-中票；等级利差已删 2026-09-14），
+        右：中票 / 银行资本债 / 资本债-中票（复用左栏两表对齐行数）；
+        等级利差已删 2026-09-14），
         变动列正=红 .up / 负=绿 .down / 零 .flat（assets.js 表格
         涨跌色后处理惯例），一律 bp；3年分位列（滚动 3 年窗口百分位）
      ②' 品种利差明细——8 品种 tab × 2×2（YTM 分期限 / 期限利差 /
@@ -195,8 +196,9 @@ PANELS["spread"] = {
         : h("div", {class: "empty"}, ["品种对比待接入"]),
     ]);
 
-    /* —— ① 周度快照表：左右两栏（左 利率债/银行资本债/中票/城投，右 资本债-中票；
-       等级利差已删 2026-09-14；Charts.table 纯 DOM，构建期即可画）—— */
+    /* —— ① 周度快照表：左右两栏（左 利率债/银行资本债/中票/城投，
+       右 中票/银行资本债/资本债-中票，行数与左栏对齐；等级利差已删 2026-09-14；
+       Charts.table 纯 DOM，构建期即可画）—— */
     const seg = (n) => n.startsWith("商业银行") ? 1 : n.startsWith("中票") ? 2
       : n.startsWith("城投债") ? 3
       : n.startsWith("二级资本债-中票") || n.startsWith("永续债-中票")
@@ -205,9 +207,9 @@ PANELS["spread"] = {
                         "中票信用利差（vs 国开）", "城投债信用利差（vs 国开）",
                         "银行资本债-中票品种利差（同等级同期限）"];
     const snapRows = snap.rows.filter((r) => !r.name.startsWith("等级利差"));
-    function segTable(gi) {
+    function segTable(gi, tag) {
       const rows = snapRows.filter((r) => seg(r.name) === gi);
-      const box = h("div", {id: "spread-snap-table-" + gi});
+      const box = h("div", {id: "spread-snap-table-" + gi + (tag ? "-" + tag : "")});
       const trs = Charts.table(box, {
         columns: [{key: "k0", label: "指标"}, {key: "k1", label: "当前", num: true},
                   {key: "k2", label: "上周", num: true}, {key: "k3", label: "变动", num: true},
@@ -225,11 +227,12 @@ PANELS["spread"] = {
       return [h("div", {style: {margin: "10px 0 2px", fontSize: "13px",
                                 color: "var(--muted)"}}, [SEG_TITLES[gi]]), box];
     }
-    const leftTables = [0, 1, 2, 3].map(segTable);
+    const leftTables = [0, 1, 2, 3].map((gi) => segTable(gi));
+    const rightTables = [2, 1, 4].map((gi) => segTable(gi, "r"));   // 中票+银行资本债+资本债-中票，行数对齐左栏
     const snapBody = !snapRows.length
       ? h("div", {class: "empty"}, ["利差快照数据待接入（python scripts/update.py --only spread）"])
       : (snapRows.some((r) => seg(r.name) === 4)
-          ? h("div", {class: "grid grid-2"}, [h("div", {}, leftTables), h("div", {}, [segTable(4)])])
+          ? h("div", {class: "grid grid-2"}, [h("div", {}, leftTables), h("div", {}, rightTables)])
           : leftTables);
     const snapCard = h("section", {class: "card", id: "spread-snap-card"}, [
       h("h3", {class: "card-title"}, ["周度利差快照（" + snapRows.length + " 项）"]),
