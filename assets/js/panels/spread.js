@@ -196,9 +196,10 @@ PANELS["spread"] = {
         : h("div", {class: "empty"}, ["品种对比待接入"]),
     ]);
 
-    /* —— ① 周度快照表：左右两栏（左 利率债/银行资本债/中票/城投，
-       右 中票/银行资本债/资本债-中票，行数与左栏对齐；等级利差已删 2026-09-14；
-       Charts.table 纯 DOM，构建期即可画）—— */
+    /* —— ① 变动总览（2026-09-14 起双分页）：tab1 收益率变动总览（银行资本债/
+       中票/城投 同档位收益率的 周/月/3M/6M/1Y 变动）；tab2 利差变动总览（原周度
+       快照，左右两栏，右 中票/银行资本债/资本债-中票 行数与左栏对齐；等级利差
+       已删）；Charts.table 纯 DOM，构建期即可画，tab 切换仅 display 显隐 —— */
     const seg = (n) => n.startsWith("商业银行") ? 1 : n.startsWith("中票") ? 2
       : n.startsWith("城投债") ? 3
       : n.startsWith("二级资本债-中票") || n.startsWith("永续债-中票")
@@ -234,14 +235,62 @@ PANELS["spread"] = {
       : (snapRows.some((r) => seg(r.name) === 4)
           ? h("div", {class: "grid grid-2"}, [h("div", {}, leftTables), h("div", {}, rightTables)])
           : leftTables);
+    const snapSub = h("div", {style: {margin: "6px 0 0", fontSize: "12px", color: "var(--muted)"}}, [
+      "利率债段收益率 %、期限与信用利差 bp，变动一律 bp · 正=红 / 负=绿 · 3年分位为滚动 3 年窗口百分位"]);
+
+    /* —— ①-a 收益率变动总览（#24）：品种收益率 周/月/3M/6M/1Y 变动 bp —— */
+    const yld = S.yields || {rows: []};
+    const YLD_COLS = [["chg1w", "周变动"], ["chg1m", "月变动"], ["chg3m", "3个月"],
+                      ["chg6m", "半年"], ["chg1y", "1年"]];
+    const YLD_TITLES = {1: "银行资本债收益率", 2: "中票收益率", 3: "城投债收益率"};
+    function yldTable(gi) {
+      const rows = yld.rows.filter((r) => seg(r.name) === gi);
+      const box = h("div", {id: "spread-yld-table-" + gi});
+      const trs = Charts.table(box, {
+        columns: [{key: "k0", label: "品种"}].concat(
+          YLD_COLS.map(([k, t]) => ({key: k, label: t, num: true}))),
+        rows: rows.map((r) => Object.assign(
+          {k0: r.name},
+          YLD_COLS.reduce((o, [k]) => (o[k] = r[k] === null || r[k] === undefined ? "—" : r[k], o), {}))),
+      });
+      trs.forEach((tr, i) => YLD_COLS.forEach(([k], j) => {   // 同快照表：正红/负绿/零灰，bp
+        const v = rows[i][k];
+        if (num(v)) tr.children[j + 1].replaceChildren(
+          h("span", {class: v > 0 ? "up" : v < 0 ? "down" : "flat"},
+            [(v > 0 ? "+" : "") + App.fmt(v, 2) + "bp"]));
+      }));
+      return [h("div", {style: {margin: "10px 0 2px", fontSize: "13px",
+                                color: "var(--muted)"}}, [YLD_TITLES[gi]]), box];
+    }
+    const yldBody = !yld.rows.length
+      ? h("div", {class: "empty"}, ["收益率变动数据待接入（python scripts/update.py --only spread）"])
+      : h("div", {class: "grid grid-2"},
+          [h("div", {}, [yldTable(1)]), h("div", {}, [yldTable(2), yldTable(3)])]);
+    const yldSub = h("div", {style: {margin: "6px 0 0", fontSize: "12px", color: "var(--muted)"}}, [
+      "品种到期收益率水平变动（bp）· 周=上周快照日（与利差总览同口径），月/3个月/半年/1年=自然月回溯最近值 · 正=红 / 负=绿"]);
+
+    /* —— ①-b 双分页切换（.tabs/.tab 复用银行资本债 tab 样式，默认收益率在前）—— */
+    const yldWrap = h("div", {id: "spread-ov-yld"}, [yldBody, yldSub]);
+    const snapWrap = h("div", {id: "spread-ov-spread", style: {display: "none"}}, [snapBody, snapSub]);
+    const ovTabs = h("div", {class: "tabs"}, [
+      h("button", {class: "tab active", "data-v": "yld",
+        onclick: () => switchOv("yld")}, ["收益率变动总览"]),
+      h("button", {class: "tab", "data-v": "spread",
+        onclick: () => switchOv("spread")}, ["利差变动总览"]),
+    ]);
+    function switchOv(v) {
+      ovTabs.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.v === v));
+      yldWrap.style.display = v === "yld" ? "" : "none";
+      snapWrap.style.display = v === "spread" ? "" : "none";
+    }
     const snapCard = h("section", {class: "card", id: "spread-snap-card"}, [
-      h("h3", {class: "card-title"}, ["周度利差快照（" + snapRows.length + " 项）"]),
+      h("h3", {class: "card-title"},
+        ["变动总览（收益率 " + yld.rows.length + " 项 / 利差 " + snapRows.length + " 项）"]),
       App.badge(BADGE, fetchedAt),
-      h("p", {class: "card-sub"}, [snapRows.length
-        ? "截至 " + snap.asOf + "（上周 " + snap.prevAsOf + "）· 利率债段收益率 %、期限与信用利差 bp，变动一律 bp"
-          + " · 正=红 / 负=绿（数值涨跌色）· 3年分位为滚动 3 年窗口百分位"
-        : "利差快照待接入"]),
-      snapBody,
+      h("p", {class: "card-sub"}, [(yld.rows.length || snapRows.length)
+        ? "截至 " + snap.asOf + "（上周 " + snap.prevAsOf + "）· 分页切换：收益率=水平变动，利差=信用/品种/期限利差（vs 国开）"
+        : "变动总览待接入"]),
+      ovTabs, yldWrap, snapWrap,
     ]);
 
     /* —— ② 银行资本债：评级档 tab，每档 二级/永续 × 1/3/5/7/10Y —— */
