@@ -4,9 +4,9 @@
      ⓪ 利差追踪-全部（页面最顶）——8 品种勾选 chips 同刷 2×2
         （YTM3Y / 期限3Y-1Y / 品种3Y / 等级3Y），至少保留 1 品种；
         .chip 无 on/off 底样式 → onclick 同步切 opacity 灰显勾选态
-     ① 周度快照表——按段拆 6 表（利率债：收益率 % + 期限利差 bp /
-        银行资本债 AAA-/AA+/AA×1~10Y / 中票 AAA~AA×1~10Y /
-        城投债 AAA~AA-×1/3/5Y / 等级利差 / 资本债-中票），
+     ① 周度快照表——左右两栏（左：利率债收益率%+期限利差bp / 银行资本债
+        AAA-/AA+/AA×1~10Y / 中票 AAA~AA×1~10Y / 城投债 AAA~AA-×1/3/5Y，
+        右：资本债-中票；等级利差已删 2026-09-14），
         变动列正=红 .up / 负=绿 .down / 零 .flat（assets.js 表格
         涨跌色后处理惯例），一律 bp；3年分位列（滚动 3 年窗口百分位）
      ②' 品种利差明细——8 品种 tab × 2×2（YTM 分期限 / 期限利差 /
@@ -31,17 +31,19 @@ PANELS["spread"] = {
     const num = (v) => v !== null && v !== undefined && v !== "" && !Number.isNaN(Number(v));
     const BADGE = "财汇中债曲线 · 二级2018-12起 永续约2021起 · 基准统一vs国开";
 
-    /* —— 变动总览卡：水平发散条形图，时间范围可选 1周/1月/3月/半年/1年 —— */
-    const GROUP_ORDER = ["bank", "mtn", "chengtou", "grade", "bankmtn"];
+    /* —— 变动总览卡：水平发散条形图左右两栏（资本债-中票独立右栏，等级利差
+       已删 2026-09-14），时间范围可选 1周/1月/3月/半年/1年 —— */
+    const GROUP_ORDER = ["bank", "mtn", "chengtou", "bankmtn"];
     const GROUP_LABEL = {bank: "银行资本债信用利差", mtn: "中票信用利差",
-                         chengtou: "城投债信用利差",
-                         grade: "等级利差", bankmtn: "资本债-中票品种利差"};
+                         chengtou: "城投债信用利差", bankmtn: "资本债-中票品种利差"};
     const RANGES = [["1周", 0], ["1月", 30], ["3月", 90], ["半年", 182], ["1年", 365]];
-    // 收集全部信用利差序列（bank+mtn+chengtou+grade+bankmtn），保留 src 引用
+    // 收集全部信用利差序列（bank+mtn+chengtou+bankmtn），保留 src 引用
     const chgItems = Object.values(seriesMap)
       .filter(s => s && GROUP_ORDER.includes(s.group))
       .sort((a, b) => GROUP_ORDER.indexOf(a.group) - GROUP_ORDER.indexOf(b.group)
              || a.label.localeCompare(b.label));
+    const chgMain = chgItems.filter(s => s.group !== "bankmtn");   // 左栏：信用利差
+    const chgMtn = chgItems.filter(s => s.group === "bankmtn");    // 右栏：品种利差
     // 快照 name→行 映射（1 周用）
     const snapByName = {};
     snap.rows.forEach(r => { snapByName[r.name] = r; });
@@ -62,11 +64,11 @@ PANELS["spread"] = {
       return Math.round((last - base) * 100) / 100;
     }
 
-    function buildChgData(rangeIdx) {
+    function buildChgData(items, rangeIdx) {
       const days = RANGES[rangeIdx][1];
       const names = [], vals = [];
       let prevGroup = "";
-      chgItems.forEach(s => {
+      items.forEach(s => {
         if (s.group !== prevGroup) {
           names.push("── " + GROUP_LABEL[s.group] + " ──");
           vals.push(null);
@@ -84,17 +86,17 @@ PANELS["spread"] = {
       return {names, vals};
     }
 
-    // 条形数随评级×期限扩展 → 高度按条数自适应（每条 22px）
-    const chgBox = h("div", {id: "spread-chg-chart", class: "chart",
-      style: {height: Math.max(500, 22 * (chgItems.length + GROUP_ORDER.length) + 40) + "px"}});
+    // 条形数随评级×期限扩展 → 高度按条数自适应（每条 22px），左右两栏各按各自条数
+    const chgHeight = (items) =>
+      Math.max(320, 22 * (items.length + new Set(items.map(s => s.group)).size) + 40) + "px";
+    const chgMainBox = h("div", {id: "spread-chg-main", class: "chart", style: {height: chgHeight(chgMain)}});
+    const chgMtnBox = h("div", {id: "spread-chg-mtn", class: "chart", style: {height: chgHeight(chgMtn)}});
     const chgTabs = h("div", {class: "tabs"}, RANGES.map(([label], i) =>
       h("button", {class: "tab" + (i === 0 ? " active" : ""), "data-ri": i,
         onclick: () => drawChg(i)}, [label])));
-    let chgChart = null;
-    function drawChg(rangeIdx) {
-      chgTabs.querySelectorAll(".tab").forEach(b =>
-        b.classList.toggle("active", +b.dataset.ri === rangeIdx));
-      const {names, vals} = buildChgData(rangeIdx);
+    const chgCharts = {};   // box.id -> echarts 实例（左右两栏各自 init / setOption）
+    function drawChgBox(box, items, rangeIdx) {
+      const {names, vals} = buildChgData(items, rangeIdx);
       const opt = {
         grid: {left: 10, right: 30, top: 10, bottom: 10, containLabel: true},
         tooltip: {trigger: "axis", backgroundColor: "#fff", borderColor: "#ddd",
@@ -116,14 +118,18 @@ PANELS["spread"] = {
             : p.value >= 0 ? "#c24135" : "#16865c", borderRadius: 2},
           data: vals}],
       };
-      if (!chgChart) {
-        const el = chgBox;
-        el.innerHTML = "";
-        chgChart = echarts.init(el);
-        chgChart.setOption(opt);
-      } else {
-        chgChart.setOption(opt, {notMerge: true});
+      let c = chgCharts[box.id];
+      if (!c) {
+        box.innerHTML = "";
+        c = chgCharts[box.id] = echarts.init(box);
       }
+      c.setOption(opt, {notMerge: true});
+    }
+    function drawChg(rangeIdx) {
+      chgTabs.querySelectorAll(".tab").forEach(b =>
+        b.classList.toggle("active", +b.dataset.ri === rangeIdx));
+      drawChgBox(chgMainBox, chgMain, rangeIdx);
+      if (chgMtn.length) drawChgBox(chgMtnBox, chgMtn, rangeIdx);
     }
     const chgCard = h("section", {class: "card", id: "spread-chg-card"}, [
       h("h3", {class: "card-title"}, ["利差变动总览"]),
@@ -131,7 +137,12 @@ PANELS["spread"] = {
       h("p", {class: "card-sub"}, [chgItems.length
         ? "正=利差走阔(红) / 负=利差收窄(绿) · 1周=周度快照chg · 其他区间取区间首末值差"
         : "利差变动总览待接入（python scripts/update.py --only spread）"]),
-      chgItems.length ? [chgTabs, chgBox] : h("div", {class: "empty"}, ["利差变动数据待接入"]),
+      chgItems.length ? [chgTabs, chgMtn.length ? h("div", {class: "grid grid-2"}, [
+        h("div", {}, [h("div", {style: {fontSize: "13px", color: "var(--muted)", margin: "0 0 2px"}},
+          ["信用利差（银行资本债 / 中票 / 城投）"]), chgMainBox]),
+        h("div", {}, [h("div", {style: {fontSize: "13px", color: "var(--muted)", margin: "0 0 2px"}},
+          ["资本债-中票品种利差"]), chgMtnBox]),
+      ]) : chgMainBox] : h("div", {class: "empty"}, ["利差变动数据待接入"]),
     ]);
 
 
@@ -184,16 +195,18 @@ PANELS["spread"] = {
         : h("div", {class: "empty"}, ["品种对比待接入"]),
     ]);
 
-    /* —— ① 周度快照表：35 行按段拆 4 张表（Charts.table 纯 DOM，构建期即可画）—— */
+    /* —— ① 周度快照表：左右两栏（左 利率债/银行资本债/中票/城投，右 资本债-中票；
+       等级利差已删 2026-09-14；Charts.table 纯 DOM，构建期即可画）—— */
     const seg = (n) => n.startsWith("商业银行") ? 1 : n.startsWith("中票") ? 2
-      : n.startsWith("城投债") ? 3 : n.startsWith("等级利差") ? 4
+      : n.startsWith("城投债") ? 3
       : n.startsWith("二级资本债-中票") || n.startsWith("永续债-中票")
-        || n.startsWith("银行永续债-中票") ? 5 : 0;
+        || n.startsWith("银行永续债-中票") ? 4 : 0;
     const SEG_TITLES = ["利率债收益率与期限利差", "银行资本债信用利差（vs 国开）",
                         "中票信用利差（vs 国开）", "城投债信用利差（vs 国开）",
-                        "等级利差（中票）", "银行资本债-中票品种利差（同等级同期限）"];
-    const snapTables = snap.rows.length ? SEG_TITLES.map((t, gi) => {
-      const rows = snap.rows.filter((r) => seg(r.name) === gi);
+                        "银行资本债-中票品种利差（同等级同期限）"];
+    const snapRows = snap.rows.filter((r) => !r.name.startsWith("等级利差"));
+    function segTable(gi) {
+      const rows = snapRows.filter((r) => seg(r.name) === gi);
       const box = h("div", {id: "spread-snap-table-" + gi});
       const trs = Charts.table(box, {
         columns: [{key: "k0", label: "指标"}, {key: "k1", label: "当前", num: true},
@@ -210,16 +223,22 @@ PANELS["spread"] = {
             [(v > 0 ? "+" : "") + App.fmt(v, 2) + "bp"]));
       });
       return [h("div", {style: {margin: "10px 0 2px", fontSize: "13px",
-                                color: "var(--muted)"}}, [t]), box];
-    }) : null;
+                                color: "var(--muted)"}}, [SEG_TITLES[gi]]), box];
+    }
+    const leftTables = [0, 1, 2, 3].map(segTable);
+    const snapBody = !snapRows.length
+      ? h("div", {class: "empty"}, ["利差快照数据待接入（python scripts/update.py --only spread）"])
+      : (snapRows.some((r) => seg(r.name) === 4)
+          ? h("div", {class: "grid grid-2"}, [h("div", {}, leftTables), h("div", {}, [segTable(4)])])
+          : leftTables);
     const snapCard = h("section", {class: "card", id: "spread-snap-card"}, [
-      h("h3", {class: "card-title"}, ["周度利差快照（" + snap.rows.length + " 项）"]),
+      h("h3", {class: "card-title"}, ["周度利差快照（" + snapRows.length + " 项）"]),
       App.badge(BADGE, fetchedAt),
-      h("p", {class: "card-sub"}, [snap.rows.length
+      h("p", {class: "card-sub"}, [snapRows.length
         ? "截至 " + snap.asOf + "（上周 " + snap.prevAsOf + "）· 利率债段收益率 %、期限与信用利差 bp，变动一律 bp"
           + " · 正=红 / 负=绿（数值涨跌色）· 3年分位为滚动 3 年窗口百分位"
         : "利差快照待接入"]),
-      snapTables ? snapTables : h("div", {class: "empty"}, ["利差快照数据待接入（python scripts/update.py --only spread）"]),
+      snapBody,
     ]);
 
     /* —— ② 银行资本债：评级档 tab，每档 二级/永续 × 1/3/5/7/10Y —— */
