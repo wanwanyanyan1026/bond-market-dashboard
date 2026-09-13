@@ -1,13 +1,14 @@
 /* ============================================================
    panels/spread.js — 利差跟踪（Phase C Task 3 → v5 Task 5 重构）
    五卡（消费 data.js spread 段，Task 2/T4 派生，2026-09-10 增资本债-中票卡）：
-     ⓪ 利差追踪-全部（页面最顶）——8 品种勾选 chips 同刷 2×2
+     （利差变动总览条形图卡 2026-09-14 删——与「变动总览」分页 tab2 重复）
+     ⓪ 利差追踪-全部——8 品种勾选 chips 同刷 2×2
         （YTM3Y / 期限3Y-1Y / 品种3Y / 等级3Y），至少保留 1 品种；
         .chip 无 on/off 底样式 → onclick 同步切 opacity 灰显勾选态
      ① 周度快照表——左右两栏（左：利率债收益率%+期限利差bp / 银行资本债
         AAA-/AA+/AA×1~10Y / 中票 AAA~AA×1~10Y / 城投债 AAA~AA-×1/3/5Y，
-        右：中票 / 银行资本债 / 资本债-中票（复用左栏两表对齐行数）；
-        等级利差已删 2026-09-14），
+        右：仅 资本债-中票（右栏中票/银行资本债与左栏重复，已删 2026-09-14，
+        左右不再对齐；等级利差已删 2026-09-14），
         变动列正=红 .up / 负=绿 .down / 零 .flat（assets.js 表格
         涨跌色后处理惯例），一律 bp；3年分位列（滚动 3 年窗口百分位）
      ②' 品种利差明细——8 品种 tab × 2×2（YTM 分期限 / 期限利差 /
@@ -31,121 +32,6 @@ PANELS["spread"] = {
     const has = (v) => Array.isArray(v) && v.some((x) => x !== null && x !== undefined && x !== "" && !Number.isNaN(Number(x)));
     const num = (v) => v !== null && v !== undefined && v !== "" && !Number.isNaN(Number(v));
     const BADGE = "财汇中债曲线 · 二级2018-12起 永续约2021起 · 基准统一vs国开";
-
-    /* —— 变动总览卡：水平发散条形图左右两栏（资本债-中票独立右栏，等级利差
-       已删 2026-09-14），时间范围可选 1周/1月/3月/半年/1年 —— */
-    const GROUP_ORDER = ["bank", "mtn", "chengtou", "bankmtn"];
-    const GROUP_LABEL = {bank: "银行资本债信用利差", mtn: "中票信用利差",
-                         chengtou: "城投债信用利差", bankmtn: "资本债-中票品种利差"};
-    const RANGES = [["1周", 0], ["1月", 30], ["3月", 90], ["半年", 182], ["1年", 365]];
-    // 收集全部信用利差序列（bank+mtn+chengtou+bankmtn），保留 src 引用
-    const chgItems = Object.values(seriesMap)
-      .filter(s => s && GROUP_ORDER.includes(s.group))
-      .sort((a, b) => GROUP_ORDER.indexOf(a.group) - GROUP_ORDER.indexOf(b.group)
-             || a.label.localeCompare(b.label));
-    const chgMain = chgItems.filter(s => s.group !== "bankmtn");   // 左栏：信用利差
-    const chgMtn = chgItems.filter(s => s.group === "bankmtn");    // 右栏：品种利差
-    // 快照 name→行 映射（1 周用）
-    const snapByName = {};
-    snap.rows.forEach(r => { snapByName[r.name] = r; });
-
-    function chgOverDays(dates, values, days) {
-      if (!dates.length) return null;
-      const last = values[values.length - 1];
-      if (last == null) return null;
-      if (days === 0) return 0;  // degenerate
-      const lastTs = new Date(dates[dates.length - 1]).getTime();
-      const cutTs = lastTs - days * 864e5;
-      let base = null;
-      for (let i = dates.length - 1; i >= 0; i--) {
-        const t = new Date(dates[i]).getTime();
-        if (t <= cutTs) { base = values[i]; break; }
-      }
-      if (base == null) return null;
-      return Math.round((last - base) * 100) / 100;
-    }
-
-    function buildChgData(items, rangeIdx) {
-      const days = RANGES[rangeIdx][1];
-      const names = [], vals = [];
-      let prevGroup = "";
-      items.forEach(s => {
-        if (s.group !== prevGroup) {
-          names.push("── " + GROUP_LABEL[s.group] + " ──");
-          vals.push(null);
-          prevGroup = s.group;
-        }
-        names.push(s.label);
-        if (days === 0) {
-          // 1周：直接取 snapshot chg
-          const row = snapByName[s.label];
-          vals.push(row ? row.chg : null);
-        } else {
-          vals.push(chgOverDays(s.dates, s.values, days));
-        }
-      });
-      return {names, vals};
-    }
-
-    // 条形数随评级×期限扩展 → 高度按条数自适应（每条 22px），左右两栏各按各自条数
-    const chgHeight = (items) =>
-      Math.max(320, 22 * (items.length + new Set(items.map(s => s.group)).size) + 40) + "px";
-    const chgMainBox = h("div", {id: "spread-chg-main", class: "chart", style: {height: chgHeight(chgMain)}});
-    const chgMtnBox = h("div", {id: "spread-chg-mtn", class: "chart", style: {height: chgHeight(chgMtn)}});
-    const chgTabs = h("div", {class: "tabs"}, RANGES.map(([label], i) =>
-      h("button", {class: "tab" + (i === 0 ? " active" : ""), "data-ri": i,
-        onclick: () => drawChg(i)}, [label])));
-    const chgCharts = {};   // box.id -> echarts 实例（左右两栏各自 init / setOption）
-    function drawChgBox(box, items, rangeIdx) {
-      const {names, vals} = buildChgData(items, rangeIdx);
-      const opt = {
-        grid: {left: 10, right: 30, top: 10, bottom: 10, containLabel: true},
-        tooltip: {trigger: "axis", backgroundColor: "#fff", borderColor: "#ddd",
-          textStyle: {fontSize: 12, color: "#333"},
-          formatter: p => {
-            const v = p[0];
-            if (v.value == null) return v.name;
-            const sign = v.value > 0 ? "+" : "";
-            return `${v.name}<br/><b style="color:${v.value >= 0 ? '#c24135' : '#16865c'}">${sign}${v.value}bp</b>`;
-          }},
-        xAxis: {type: "value", axisLabel: {fontSize: 11, formatter: v => (v > 0 ? "+" : "") + v + "bp"},
-          splitLine: {lineStyle: {type: "dashed", opacity: 0.3}}},
-        yAxis: {type: "category", data: names, inverse: true,
-          axisLabel: {fontSize: 11, width: 155, overflow: "truncate",
-            formatter: v => v.startsWith("──") ? `{seg|${v}}` : v,
-            rich: {seg: {fontSize: 11, fontWeight: "bold", color: "var(--blue)"}}}},
-        series: [{type: "bar", barMaxWidth: 14,
-          itemStyle: {color: p => p.value == null ? "transparent"
-            : p.value >= 0 ? "#c24135" : "#16865c", borderRadius: 2},
-          data: vals}],
-      };
-      let c = chgCharts[box.id];
-      if (!c) {
-        box.innerHTML = "";
-        c = chgCharts[box.id] = echarts.init(box);
-      }
-      c.setOption(opt, {notMerge: true});
-    }
-    function drawChg(rangeIdx) {
-      chgTabs.querySelectorAll(".tab").forEach(b =>
-        b.classList.toggle("active", +b.dataset.ri === rangeIdx));
-      drawChgBox(chgMainBox, chgMain, rangeIdx);
-      if (chgMtn.length) drawChgBox(chgMtnBox, chgMtn, rangeIdx);
-    }
-    const chgCard = h("section", {class: "card", id: "spread-chg-card"}, [
-      h("h3", {class: "card-title"}, ["利差变动总览"]),
-      App.badge("财汇中债曲线 · 变动一律 bp", fetchedAt),
-      h("p", {class: "card-sub"}, [chgItems.length
-        ? "正=利差走阔(红) / 负=利差收窄(绿) · 1周=周度快照chg · 其他区间取区间首末值差"
-        : "利差变动总览待接入（python scripts/update.py --only spread）"]),
-      chgItems.length ? [chgTabs, chgMtn.length ? h("div", {class: "grid grid-2"}, [
-        h("div", {}, [h("div", {style: {fontSize: "13px", color: "var(--muted)", margin: "0 0 2px"}},
-          ["信用利差（银行资本债 / 中票 / 城投）"]), chgMainBox]),
-        h("div", {}, [h("div", {style: {fontSize: "13px", color: "var(--muted)", margin: "0 0 2px"}},
-          ["资本债-中票品种利差"]), chgMtnBox]),
-      ]) : chgMainBox] : h("div", {class: "empty"}, ["利差变动数据待接入"]),
-    ]);
-
 
     /* —— ⓪ 利差追踪-全部（页面最顶）：品种勾选 + 2×2（YTM3Y / 期限3Y-1Y / 品种3Y / 等级3Y）—— */
     const variety = Array.isArray(S.variety) ? S.variety : [];
@@ -198,8 +84,9 @@ PANELS["spread"] = {
 
     /* —— ① 变动总览（2026-09-14 起双分页）：tab1 收益率变动总览（银行资本债/
        中票/城投 同档位收益率的 周/月/3M/6M/1Y 变动）；tab2 利差变动总览（原周度
-       快照，左右两栏，右 中票/银行资本债/资本债-中票 行数与左栏对齐；等级利差
-       已删）；Charts.table 纯 DOM，构建期即可画，tab 切换仅 display 显隐 —— */
+       快照，左右两栏，右栏仅 资本债-中票——中票/银行资本债与左栏重复已删
+       （2026-09-14，左右不对齐；等级利差已删）；Charts.table 纯 DOM，构建期
+       即可画，tab 切换仅 display 显隐 —— */
     const seg = (n) => n.startsWith("商业银行") ? 1 : n.startsWith("中票") ? 2
       : n.startsWith("城投债") ? 3
       : n.startsWith("二级资本债-中票") || n.startsWith("永续债-中票")
@@ -229,7 +116,7 @@ PANELS["spread"] = {
                                 color: "var(--muted)"}}, [SEG_TITLES[gi]]), box];
     }
     const leftTables = [0, 1, 2, 3].map((gi) => segTable(gi));
-    const rightTables = [2, 1, 4].map((gi) => segTable(gi, "r"));   // 中票+银行资本债+资本债-中票，行数对齐左栏
+    const rightTables = [4].map((gi) => segTable(gi, "r"));   // 仅资本债-中票：中票/银行资本债右栏与左栏重复已删（2026-09-14，左右不对齐）
     const snapBody = !snapRows.length
       ? h("div", {class: "empty"}, ["利差快照数据待接入（python scripts/update.py --only spread）"])
       : (snapRows.some((r) => seg(r.name) === 4)
@@ -387,9 +274,8 @@ PANELS["spread"] = {
 
     /* 组装后统一绘制（echarts.init 需容器在文档中取非零宽高）：全部卡最顶、银行资本债改全幅单卡 */
     root.append(Export.btn("spread"));
-    root.append(chgCard, snapCard, allCard, detailCard, bankCard, bankmtnCard);
+    root.append(snapCard, allCard, detailCard, bankCard, bankmtnCard);
 
-    if (chgItems.length) { drawChg(0); }
     if (variety.length) { redrawAll(); drawDetail(variety[0].name); }
     if (bankSeries.length) drawBank("AAA-");
     if (mtnSeries.length) drawBankmtn("AAA-");
