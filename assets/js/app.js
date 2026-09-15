@@ -50,8 +50,8 @@ const App = {
 
   /* 右上角数据日期：当前面板模块 asOf，无（如 home 聚合页/JSON 模块）回退全局 */
   asOf(id) {
-    const mm = (DATA.meta && DATA.meta.modules) || {};
-    const d = (mm[id] && mm[id].asOf) || (DATA.meta && DATA.meta.asOf) || "";
+    const meta = (typeof DATA !== "undefined" && DATA.meta) || {};  // dev 自检页无 data.js
+    const d = (meta.modules && meta.modules[id] && meta.modules[id].asOf) || meta.asOf || "";
     const el = document.getElementById("sidebar-foot");
     if (el) el.textContent = d ? "数据更新于 " + d : "";
   },

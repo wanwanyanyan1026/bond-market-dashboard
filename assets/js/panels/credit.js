@@ -66,7 +66,7 @@ PANELS["credit"] = {
       let expanded = false;
       btn.addEventListener("click", () => {
         expanded = !expanded;
-        Object.assign(div.style, expanded ? fullStyle : shortStyle);
+        Object.assign(div.style, expanded ? {...fullStyle, overflow: "", display: "block", WebkitLineClamp: "", WebkitBoxOrient: ""} : shortStyle);
         btn.textContent = expanded ? "收起 ▴" : "展开 ▾";
       });
       // 检测是否需要展开按钮（延迟到DOM挂载后）
