@@ -96,8 +96,8 @@ function renderQuotes(root) {
         chartBox.innerHTML = "";                   // seasonal 不自清容器，清掉 line 留下的切换条与内层 box
         Charts.seasonal(chartBox, {years, byYear: by, yUnit: r.unit || "", xLabels: MONTHS});
         seasonBtn.textContent = "返回全历史";
-        seasonNote.textContent = (r.freq === "周" || r.freq === "旬")
-          ? r.freq + "频取月末观测按月对齐" : "日频取月末值按月对齐"
+        seasonNote.textContent = ((r.freq === "周" || r.freq === "旬")
+          ? r.freq + "频取月末观测按月对齐" : "日频取月末值按月对齐")
           + " · 近 " + years.length + " 年，当年高亮";
       } else {
         Charts.line(chartBox, {series: [{name: r.name || r.key, dates: r.dates || [], values: r.values || []}],

@@ -119,7 +119,7 @@ PANELS["fiscal"] = {
       const d = Array.isArray(sc.years) ? sc : (sc[type] || sc["合计"] || {});
       seasonTabs.forEach(t => t.classList.toggle("active", t === {合计: tabTotal, 国债: tabGov, 地方债: tabLocal}[type]));
       seasonBox.innerHTML = "";
-      Charts.seasonal(seasonBox, {years: d.years || [], byYear: d.byYear || {}, dates: d.dates || []});
+      Charts.seasonal(seasonBox, {years: d.years || [], byYear: d.byYear || {}});
     }
     tabTotal.addEventListener("click", () => drawSeasonal("合计"));
     tabGov.addEventListener("click", () => drawSeasonal("国债"));
