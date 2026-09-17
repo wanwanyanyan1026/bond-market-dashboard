@@ -12,8 +12,8 @@
 /*   数据注记：
    - v4 起数据源 = V盘宏观数据 parquet（日/周/旬/月混频），badge/modal 统一标"V盘宏观数据"
    - 走势列：Charts.sparkline 近 36 期（同基本面面板手法）
-   - freq="周"/"旬" 品种：品种行加频段小标签，其 wow/mom/yoy 观测位口径为
-     周 1/4/52、旬 1/3/36（build_data 侧计算）
+   - 品种行统一加频段小标签（日/旬/周/月/季/年，M 映射为月频），wow/mom/yoy 观测位
+     口径见 build_data step 映射（周 1/4/52、旬 1/3/36、月 1/1/12 等）
    - 季节性月变换按（年,月）归位 12 格、每格取该月最后一个观测——日频即月末价，
      周/旬频即月末观测
    - 变动着色为数值涨跌中性惯例（正红▲/负绿▼，与首页债市多空语义区分），卡片子标题注明
@@ -96,7 +96,7 @@ function renderQuotes(root) {
         chartBox.innerHTML = "";                   // seasonal 不自清容器，清掉 line 留下的切换条与内层 box
         Charts.seasonal(chartBox, {years, byYear: by, yUnit: r.unit || "", xLabels: MONTHS});
         seasonBtn.textContent = "返回全历史";
-        seasonNote.textContent = ((r.freq === "周" || r.freq === "旬")
+        seasonNote.textContent = (["周", "旬", "季", "年"].includes(r.freq)
           ? r.freq + "频取月末观测按月对齐" : "日频取月末值按月对齐")
           + " · 近 " + years.length + " 年，当年高亮";
       } else {
@@ -210,11 +210,11 @@ function renderQuotes(root) {
         const sbox = h("div", {style: {display: "inline-block", verticalAlign: "middle"}});
         sd.append(sbox);
         Charts.sparkline(sbox, (r.values || []).slice(-36));
-        if (r.freq === "周" || r.freq === "旬") {                   // 周/旬频品种：品种格追加频段标签
+        if (r.freq) {                                              // 品种格追加频段标签（全频率，M→月）
           tr.cells[0].append(h("span", {style: {display: "inline-block", marginLeft: "6px",
             padding: "0 7px", borderRadius: "999px", fontSize: "11px", lineHeight: "18px",
             background: "var(--surface-soft)", color: "var(--muted)", verticalAlign: "1px"}},
-            [r.freq + "频"]));
+            [r.freq === "M" ? "月频" : r.freq + "频"]));
         }
       });
     }
