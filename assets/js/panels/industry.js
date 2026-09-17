@@ -142,13 +142,13 @@ function renderQuotes(root) {
       [50, "#fff9c4", "#26221f"], [37.5, "#d3e8ae", "#26221f"], [25, "#a5d6a7", "#1c4020"],
       [12.5, "#66bb6a", "#0b3d0f"], [-Infinity, "#1b5e20", "#fff"],
     ];
-    const deltaTag = (sc, sp) => {                 // 纵向变化箭头：较一月前分值（|Δ|<1 视平不显）
+    const deltaTag = (sc, sp) => {                 // 纵向变化箭头：较一月前分值（|Δ|<1 视平显灰 -）
       if (sc === null || sc === undefined || sp === null || sp === undefined) return null;
       const d = Math.round((sc - sp) * 10) / 10;
-      if (Math.abs(d) < 1) return null;
+      const flat = Math.abs(d) < 1;
       return h("span", {title: "较一月前 " + sp + " → " + sc,
-        style: {fontSize: "11px", verticalAlign: "1px", color: d > 0 ? "#c62828" : "#2e7d32"}},
-        [d > 0 ? "▲+" + d : "▼" + d]);
+        style: {fontSize: "11px", verticalAlign: "1px", color: flat ? "#9e9e9e" : d > 0 ? "#c62828" : "#2e7d32"}},
+        [flat ? "-" : d > 0 ? "▲+" + d : "▼" + d]);
     };
     const scoreChip = (sc, sp) => {
       const b = (sc === null || sc === undefined) ? null : BANDS.find(([lo]) => sc >= lo);
@@ -232,7 +232,7 @@ function renderQuotes(root) {
           h("h3", {class: "card-title"}, ["公司观察", badgeSlot]),
           h("p", {class: "card-sub"},
             ["六主体共用一卡，点主体名切换 · 分值=组内品种动量近3年历史分位均值（0-100，成本·前缀反向计分：分高=毛利扩张）"
-              + " · 各主体品种篮子不同，分值仅供同主体纵向跟踪，跨主体不可直接对比 · ▲▼=较一月前变化"]),
+              + " · 各主体品种篮子不同，分值仅供同主体纵向跟踪，跨主体不可直接对比 · ▲▼=较一月前变化（-=持平）"]),
           compTabs, compBox]);
         COMP.forEach((cg) => { cardEls[cg] = card; });
         root.append(card);

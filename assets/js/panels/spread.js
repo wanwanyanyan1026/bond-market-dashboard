@@ -91,10 +91,14 @@ PANELS["spread"] = {
     const seg = (n) => n.startsWith("商业银行") ? 1 : n.startsWith("中票") ? 2
       : n.startsWith("城投债") ? 3
       : n.startsWith("二级资本债-中票") || n.startsWith("永续债-中票")
-        || n.startsWith("银行永续债-中票") ? 4 : 0;
+        || n.startsWith("银行永续债-中票") ? 4
+      : n.startsWith("二级资本债-商金债") || n.startsWith("永续债-商金债") ? 5
+      : n.startsWith("城投-中票") ? 6 : 0;
     const SEG_TITLES = ["利率债期限利差", "银行资本债信用利差（vs 国开）",
                         "中票信用利差（vs 国开）", "城投债信用利差（vs 国开）",
-                        "银行资本债-中票品种利差（同等级同期限）"];
+                        "银行资本债-中票品种利差（同等级同期限）",
+                        "二永-商金债利差（次级/永续期权价值；AAA- 档 vs 银行普通 AAA 为错档含评级差，AA+ 档同档）",
+                        "城投-中票品种利差（同等级同期限，城投溢价）"];
     const snapRows = snap.rows.filter((r) => !r.name.startsWith("等级利差"));
     // 收益率/利差分流（2026-09-14）：段 0 无"利差"字样行 = 利率债收益率 → tab1；
     // tab2 只留利差行（期限/信用/品种），段 1-4 原本全为利差不受影响
@@ -124,7 +128,7 @@ PANELS["spread"] = {
                      "spread-snap-table-" + gi + (tag ? "-" + tag : ""), SEG_TITLES[gi]);
     }
     const leftTables = [0, 1, 2, 3].map((gi) => segTable(gi));
-    const rightTables = [4].map((gi) => segTable(gi, "r"));   // 仅资本债-中票：中票/银行资本债右栏与左栏重复已删（2026-09-14，左右不对齐）
+    const rightTables = [4, 5, 6].map((gi) => segTable(gi, "r"));   // 右栏: 资本债-中票 + 二永-商金债 + 城投-中票（品种间利差对，2026-09-17）
     const snapBody = !snapRows.length
       ? h("div", {class: "empty"}, ["利差快照数据待接入（python scripts/update.py --only spread）"])
       : (spreadRows.some((r) => seg(r.name) === 4)

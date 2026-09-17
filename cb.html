@@ -80,7 +80,7 @@
     </div>
     <div class="card">
       <div class="badge">周频披露 · 最新 <span id="cap-date">—</span>（口径滞后约 1 周）</div>
-      <div class="card-title">A股资金面</div>
+      <div class="card-title">A股资金面（周频）</div>
       <div id="tbl-capital"></div>
       <div class="risk-note" id="cap-risk"></div>
     </div>
@@ -152,7 +152,7 @@
 
 </main>
 
-<script src="assets/data/data.js?v=cb-15"></script>
+<script src="assets/data/data.js?v=cb-20"></script>
 <script src="assets/js/echarts.min.js"></script>
 <script>
 /* ============================================================
@@ -353,10 +353,10 @@ const balCell = m => m.bal == null ? "—" :
   document.getElementById("strat-badge").textContent = "skill 策略雷达规则 · 财汇本地";
   function showStrat(k) {
     const list = strat[k] || [];
-    const cols = [{t: "转债"}, {t: "价格", num: 1}, {t: "平价", num: 1}, {t: "溢价%", num: 1},
+    const cols = [{t: "转债"}, {t: "评级"}, {t: "价格", num: 1}, {t: "平价", num: 1}, {t: "溢价%", num: 1},
                   {t: "双低", num: 1}, {t: "纯债溢价%", num: 1}, {t: "YTM%", num: 1}, {t: "余额(亿)", num: 1}];
     if (k === "beta_offense") cols.push({t: "Beta", num: 1});
-    const tbl = tblHTML(cols, list.map(m => [`<span class="strong">${m.b}</span>`, fmt2(m.p), fmt2(m.cv),
+    const tbl = tblHTML(cols, list.map(m => [`<span class="strong">${m.b}</span>`, m.rt || "—", fmt2(m.p), fmt2(m.cv),
         fmt2(m.pr), fmt2(m.dl), fmt2(m.pb), m.y == null ? "—" : fmt2(m.y), balCell(m),
         ...(k === "beta_offense" ? [fmt2(m.beta)] : [])]));
     sTbl.innerHTML = (k === "beta_offense" && !rg.strong)
@@ -388,7 +388,8 @@ const balCell = m => m.bal == null ? "—" :
     if (a.st === "lock" && a.lock) return `发行锁定期至 ${dFull(a.lock)}（条款：发行后 N 月内不赎回）`;
     if (a.st === "noredeem" && a.nr)
       return `不赎回公告 ${annLink(a.nr, dFull(a.nr.pub))}` + (a.nr.end ? ` · 重新计数/承诺至 ${dFull(a.nr.end)}` : ` · 自 ${dFull(a.nr.pub)} 起重新计数`);
-    if (a.nr && a.st === "met") return `曾公告不赎回 ${annLink(a.nr, dFull(a.nr.pub))}（承诺已过期）`;
+    if (a.nr && (a.st === "met" || a.st === "count"))
+      return `曾公告不赎回 ${annLink(a.nr, dFull(a.nr.pub))}（承诺已过期 · 重新计数中）`;
     return "—";
   };
   const nrCommit = a => a.end
@@ -434,12 +435,12 @@ const balCell = m => m.bal == null ? "—" :
         [{t: "转债"}, {t: "股东大会日", num: 1}, {t: "平价", num: 1}, {t: "价格", num: 1}],
         list.filter(a => a.lvl === "revprop").map(a =>
           [`<span class="strong">${a.b}</span>`, dFull(a.meet), fmt2(a.par), fmt2(a.p)]));
-      html += sub("🟣 下修博弈（30 日观察窗内平价 &lt;85 天数 · ≥15 已触发待公司决定 / 10-14 计数中）",
+      html += sub("🟣 下修博弈（30 日观察窗内平价 &lt;85 天数 · ≥15 已触发待公司决定 / &lt;15 计数中）",
         [{t: "转债"}, {t: "计数进度（30 日窗）", num: 1}, {t: "平价", num: 1}, {t: "状态"}, {t: "价格", num: 1}],
         list.filter(a => a.lvl === "revwatch").map(a =>
           [`<span class="strong">${a.b}</span>`, `${bar(a.c, 15)} ${a.c}/15`, fmt2(a.par),
            a.prop ? `已提议·股东大会 ${a.prop.replace(/.*：/, "")}`
-                  : (a.days == null ? "已触发·待决定" : `还差 ${a.days} 天`), fmt2(a.p)]));
+                  : (a.days == null ? "已触发·待公司决定（未提议）" : `计数中·还差 ${a.days} 天`), fmt2(a.p)]));
       html += sub("🟣 已公告不下修（近 90 日 · 巨潮公告检索）",
         [{t: "转债"}, {t: "公告日", num: 1}, {t: "承诺期 / 重新计数", num: 1}],
         list.filter(a => a.lvl === "norevise").map(a =>

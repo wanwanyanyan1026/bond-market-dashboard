@@ -17,7 +17,7 @@
 <main id="panel-root" class="main"></main>
 
 <!-- 依序：数据 → 图表库 → 图表封装 → 导出 → 各面板注册 → 应用路由 -->
-<script src="assets/data/data.js?v=2026-09-17.1149"></script>
+<script src="assets/data/data.js?v=2026-09-17.1417"></script>
 <script src="assets/js/echarts.min.js"></script>
 <script src="assets/js/charts.js"></script>
 <script src="assets/js/vendor/xlsx.min.js"></script>
@@ -195,13 +195,13 @@ PANELS["home"] = {
 };
 </script>
 <script src="assets/js/panels/fundamentals.js"></script>
-<script src="assets/js/panels/industry.js?v=20260917b"></script>
+<script src="assets/js/panels/industry.js?v=20260917c"></script>
 <script src="assets/js/panels/fiscal.js"></script>
 <script src="assets/js/panels/liquidity.js"></script>
 <script src="assets/js/panels/institution.js"></script>
 <script src="assets/js/panels/assets.js"></script>
 <script src="assets/js/panels/value.js"></script>
-<script src="assets/js/panels/spread.js?v=20260914b"></script>
+<script src="assets/js/panels/spread.js?v=20260917a"></script>
 <script src="assets/js/panels/credit.js"></script>
 <script>
 /* ============================================================
@@ -949,6 +949,36 @@ PANELS["curve"] = {
     a.title = "每日复盘（转债×正股）+ 全景&策略雷达";
     nav.appendChild(a);
   } else { setTimeout(addCbLink, 120); }
+})();
+</script>
+
+<script>
+/* 品种性价比入口（相对价值模块子页 variety.html 第2页；挂到「相对价值」条目之下） */
+(function addVarietyLink() {
+  var nav = document.getElementById("nav");
+  if (nav && nav.children.length) {
+    var a = document.createElement("a");
+    a.className = "menu-link"; a.href = "variety.html";
+    a.style.paddingLeft = "30px";          // 视觉上作为「相对价值」的子项
+    a.innerHTML = '<i class="menu-ico">🎯</i>品种性价比';
+    a.title = "相对价值模块 · 第二页：多窗口分位×布林矩阵 + 四象限 + 布林带下钻";
+    var v = nav.querySelector('[data-panel="value"]');
+    v ? v.insertAdjacentElement("afterend", a) : nav.appendChild(a);  // 找不到面板按钮时退回尾部
+  } else { setTimeout(addVarietyLink, 120); }
+})();
+</script>
+
+<script>
+/* 超长债温度计入口（thermo30y.html 独立子页；量化信号模块的日频补充） */
+(function addThermoLink() {
+  var nav = document.getElementById("nav");
+  if (nav && nav.children.length) {
+    var a = document.createElement("a");
+    a.className = "menu-link"; a.href = "thermo30y.html";
+    a.innerHTML = '<i class="menu-ico">🌡️</i>超长债温度计';
+    a.title = "30Y国债交易情绪三因子温度计 · 五区间择时（量化信号 · 日频补充）";
+    nav.appendChild(a);
+  } else { setTimeout(addThermoLink, 120); }
 })();
 </script>
 
