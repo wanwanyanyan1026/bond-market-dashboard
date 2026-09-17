@@ -152,7 +152,7 @@
 
 </main>
 
-<script src="assets/data/data.js?v=cb-20"></script>
+<script src="assets/data/data.js?v=cb-21"></script>
 <script src="assets/js/echarts.min.js"></script>
 <script>
 /* ============================================================
@@ -345,6 +345,7 @@ const balCell = m => m.bal == null ? "—" :
     {k: "low_price", t: "低价高YTM（债性防御）", note: "90-115 元且 YTM≥0，按 YTM 降序 Top20"},
     {k: "low_premium", t: "低溢价（偏股进攻）", note: "溢价 -8~10pp 且平价≥90，按溢价升序 Top20"},
     {k: "beta_offense", t: "正股高Beta进攻", note: "正股 120 日 beta≥1.1 且平价≥90、价≤150（弱周期自动缺席）"},
+    {k: "momentum", t: "动量（趋势跟随）", note: "转债20日动量降序 Top20；附正股20日动量对照（转债动量为排序键；趋势/强周期因子，弱周期仅供观察）"},
   ];
   const sTabs = document.getElementById("strat-tabs");
   const sTbl = document.getElementById("strat-tbl");
@@ -356,11 +357,15 @@ const balCell = m => m.bal == null ? "—" :
     const cols = [{t: "转债"}, {t: "评级"}, {t: "价格", num: 1}, {t: "平价", num: 1}, {t: "溢价%", num: 1},
                   {t: "双低", num: 1}, {t: "纯债溢价%", num: 1}, {t: "YTM%", num: 1}, {t: "余额(亿)", num: 1}];
     if (k === "beta_offense") cols.push({t: "Beta", num: 1});
+    if (k === "momentum") cols.push({t: "转债动量%", num: 1}, {t: "正股动量%", num: 1});
     const tbl = tblHTML(cols, list.map(m => [`<span class="strong">${m.b}</span>`, m.rt || "—", fmt2(m.p), fmt2(m.cv),
         fmt2(m.pr), fmt2(m.dl), fmt2(m.pb), m.y == null ? "—" : fmt2(m.y), balCell(m),
-        ...(k === "beta_offense" ? [fmt2(m.beta)] : [])]));
-    sTbl.innerHTML = (k === "beta_offense" && !rg.strong)
-      ? `<div class="empty">⚠ 弱周期（动量 ${fmt2(rg.momentum)}%）：进攻榜规则上建议缺席，下表仅供观察</div>` + tbl
+        ...(k === "beta_offense" ? [fmt2(m.beta)] : []),
+        ...(k === "momentum" ? [fmt2(m.mcb), m.mst == null ? "—" : fmt2(m.mst)] : [])]));
+    const offTabs = k === "beta_offense" || k === "momentum";
+    const offLbl = k === "beta_offense" ? "进攻榜" : "动量榜";
+    sTbl.innerHTML = (offTabs && !rg.strong)
+      ? `<div class="empty">⚠ 弱周期（动量 ${fmt2(rg.momentum)}%）：${offLbl}属趋势/进攻型，规则上建议缺席，下表仅供观察</div>` + tbl
       : (list.length ? tbl : `<div class="empty">本期无入选券</div>`);
   }
   defs.forEach((d, i) => {

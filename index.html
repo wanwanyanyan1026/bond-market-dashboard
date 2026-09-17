@@ -17,7 +17,7 @@
 <main id="panel-root" class="main"></main>
 
 <!-- 依序：数据 → 图表库 → 图表封装 → 导出 → 各面板注册 → 应用路由 -->
-<script src="assets/data/data.js?v=2026-09-17.1417"></script>
+<script src="assets/data/data.js?v=2026-09-17.1453"></script>
 <script src="assets/js/echarts.min.js"></script>
 <script src="assets/js/charts.js"></script>
 <script src="assets/js/vendor/xlsx.min.js"></script>
@@ -975,9 +975,11 @@ PANELS["curve"] = {
   if (nav && nav.children.length) {
     var a = document.createElement("a");
     a.className = "menu-link"; a.href = "thermo30y.html";
+    a.style.paddingLeft = "30px";          // 视觉上作为「量化信号」的子项
     a.innerHTML = '<i class="menu-ico">🌡️</i>超长债温度计';
     a.title = "30Y国债交易情绪三因子温度计 · 五区间择时（量化信号 · 日频补充）";
-    nav.appendChild(a);
+    var q = nav.querySelector('[data-panel="quant"]');
+    q ? q.insertAdjacentElement("afterend", a) : nav.appendChild(a);  // 找不到面板按钮时退回尾部
   } else { setTimeout(addThermoLink, 120); }
 })();
 </script>
