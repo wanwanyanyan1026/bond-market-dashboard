@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>可转债模块 · 债市跟踪</title>
+<link rel="stylesheet" href="assets/css/terminal.css">
+<style>
+/* cb.html 专属：复盘正文（等宽 pre-wrap）与 KPI 徽标行 */
+.review-body {
+  white-space: pre-wrap;
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--text);
+  max-height: 460px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+@media (max-width: 1100px) { .grid-2 { grid-template-columns: 1fr; } }
+.risk-note {
+  font-size: 12px; color: var(--muted); line-height: 1.6;
+  border-top: 1px dashed var(--line); padding-top: 10px; margin-top: 12px;
+}
+.kpi-row { display: flex; flex-wrap: wrap; gap: 12px 34px; align-items: center; }
+.regime-chip { padding: 4px 14px; font-size: 13px; font-weight: 600; border-radius: 999px; }
+.regime-strong { background: #fdeaea; color: var(--danger); }
+.regime-weak { background: #e8f6f0; color: var(--success); }
+.small-bal { color: var(--warning, #b7791f); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="brand">可转债模块<small>转债×正股联动 · 全景&策略雷达</small></div>
+  <nav class="nav">
+    <button class="menu-link active" data-view="review"><i class="menu-ico">📋</i>每日复盘</button>
+    <button class="menu-link" data-view="panorama"><i class="menu-ico">🧭</i>全景 & 策略</button>
+    <a class="menu-link" href="index.html"><i class="menu-ico">←</i>返回主站</a>
+  </nav>
+  <div class="sidebar-foot" id="side-foot">数据更新于 —</div>
+</aside>
+
+<main class="main">
+
+<!-- ================= Tab 1 每日复盘 ================= -->
+<section id="view-review">
+  <h2 class="panel-h">转债每日复盘 <span id="review-date" class="chip" style="margin-left:8px"></span></h2>
+
+  <div class="card">
+    <div class="badge">财汇数据库 · 估值表（公募转债，已剔EB）</div>
+    <div class="card-title">市场概览</div>
+    <div class="kpi-row" id="mkt-kpis"></div>
+  </div>
+
+  <div class="card">
+    <div class="badge">等权=100 归一 · 含中证转债(000832)对照 · 近一年 · 滚轮/拖拽缩放</div>
+    <div class="card-title">转债等权指数 & 中位溢价率</div>
+    <div class="chart" id="ch-index" style="height:360px"></div>
+  </div>
+  <div class="card">
+      <div class="badge">点=个券（大=涨幅大，红涨绿跌）</div>
+      <div class="card-title">转债 × 正股 当日联动</div>
+      <div class="chart" id="ch-pair" style="height:340px"></div>
+    </div>
+
+  <div class="card">
+    <div class="badge">每日复盘 · 近5日</div>
+    <div class="card-title">A股复盘</div>
+    <div class="tabs" id="htsc-tabs"></div>
+    <div class="review-body" id="htsc-body">—</div>
+    <div class="risk-note" id="htsc-risk"></div>
+  </div>
+
+  <div class="grid grid-2">
+    <div class="card">
+      <div class="badge">日频 · 最新 <span id="emo-date">—</span></div>
+      <div class="card-title">A股情绪指数（近90日）</div>
+      <div class="chart" id="ch-emo"></div>
+      <div class="risk-note" id="emo-risk"></div>
+    </div>
+    <div class="card">
+      <div class="badge">周频披露 · 最新 <span id="cap-date">—</span>（口径滞后约 1 周）</div>
+      <div class="card-title">A股资金面</div>
+      <div id="tbl-capital"></div>
+      <div class="risk-note" id="cap-risk"></div>
+    </div>
+  </div>
+
+  <div class="grid grid-2">
+    <div class="card">
+      <div class="card-title">当日涨幅榜 Top15 <span style="font-weight:400;font-size:12px;color:var(--muted)">（转债% vs 正股%）</span></div>
+      <div id="tbl-top"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">当日跌幅榜 Top15</div>
+      <div id="tbl-bottom"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= Tab 2 全景 & 策略 ================= -->
+<section id="view-panorama" style="display:none">
+  <h2 class="panel-h">转债全景 & 策略雷达 <span id="pan-date" class="chip" style="margin-left:8px"></span></h2>
+
+  <div class="card">
+    <div class="badge">财汇数据库 · 估值表 / 回售赎回公告（公募转债，已剔EB）</div>
+    <div class="card-title">市场全景</div>
+    <div class="kpi-row" id="pan-kpis"></div>
+  </div>
+
+  <div class="grid grid-2">
+    <div class="card">
+      <div class="card-title">价格分布</div>
+      <div class="chart" id="ch-dist"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">平价带 × 转股溢价率中位</div>
+      <div class="chart" id="ch-bands"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="badge">点=个券（色=转债价格）</div>
+    <div class="card-title">平价 - 溢价率 全景</div>
+    <div class="chart" id="ch-scatter" style="height:380px"></div>
+  </div>
+
+  <div class="card">
+    <div class="badge">月度披露 · 最新 <span id="ind-date2">—</span></div>
+    <div class="card-title">正股一级行业景气度</div>
+    <div class="card-sub" id="ind-date"></div>
+    <div class="chart" id="ch-ind" style="height:460px"></div>
+    <div class="risk-note" id="ind-risk"></div>
+  </div>
+
+  <div class="card">
+    <div class="badge" id="strat-badge">—</div>
+    <div class="card-title">策略雷达 · 当日机会表</div>
+    <div class="card-sub" id="strat-note"></div>
+    <div class="tabs" id="strat-tabs"></div>
+    <div id="strat-tbl"></div>
+  </div>
+
+  <div class="card">
+    <div class="badge" id="alert-badge">口径见卡片脚注</div>
+    <div class="card-title">条款预警（强赎 / 下修 / 回售）</div>
+    <div class="card-sub">🔴 强赎：关键日=最后转股日（赎回登记日）；🔵 到期兑付：关键日=兑付日 · 🟡 强赎临界=条款口径（30 日观察窗内正股≥转股价 130% 天数，已公告不赎回的自承诺截止日重新计数，发行锁定=新券原始条款）· 🟣 下修分四组：落地（近 45 日）/ 提议下修（董事会已提议待股东大会，集思录）/ 博弈（30 日观察窗内平价&lt;85 天数，≥15 已触发待公司决定，集思录条款口径校准）/ 公告不下修（承诺期来自公告解析）· ℹ️ 回售申报窗口</div>
+    <div class="tabs" id="alert-tabs"></div>
+    <div id="tbl-alerts"></div>
+  </div>
+</section>
+
+</main>
+
+<script src="assets/data/data.js?v=cb-15"></script>
+<script src="assets/js/echarts.min.js"></script>
+<script>
+/* ============================================================
+   cb.html — 可转债模块（每日复盘 / 全景&策略）
+   数据：DATA.cb_review（华泰复盘API + 情绪/资金面 + 财汇估值表联动）
+        DATA.cb_panorama（截面全景 + 策略雷达 + 行业景气 + 条款预警）
+   零依赖 app.js/charts.js（独立子页，echarts 原生 API）。
+   Tab2 隐藏时 echarts.init 尺寸为 0 → 图表全部懒初始化（首次切换时）。
+   ============================================================ */
+const R = DATA.cb_review || {}, P = DATA.cb_panorama || {};
+const RISK = "风险揭示：以上内容由 AI 基于第三方券商研究报告及其附属成果总结生成，可能省略完整报告中的重要信息、市场风险、业绩不及预期等风险，请务必阅读完整原始报告。有关数据、观点、评级等具有时效性，请自行核实最新信息。以上内容仅供研究学习使用，不构成任何投资建议。请勿二次传播并自行承担投资风险。";
+const fmt2 = x => (x == null || isNaN(x)) ? "—" : Number(x).toFixed(2);
+const pct = x => (x == null || isNaN(x)) ? "—" : (x > 0 ? "+" : "") + Number(x).toFixed(2) + "%";
+const updown = x => x == null || x === 0 || isNaN(x) ? "flat" : (x > 0 ? "up" : "down");
+
+/* ---------- 图表登记（resize 统一处理） ---------- */
+const CHARTS = [];
+function ch(id, opt) {
+  const c = echarts.init(document.getElementById(id));
+  c.setOption(opt);
+  CHARTS.push(c);
+  return c;
+}
+window.addEventListener("resize", () => CHARTS.forEach(c => c.resize()));
+
+/* ---------- 侧栏切换（Tab2 图表懒初始化） ---------- */
+let panInited = false;
+document.querySelectorAll(".menu-link[data-view]").forEach(btn =>
+  btn.onclick = () => {
+    document.querySelectorAll(".menu-link[data-view]").forEach(b => b.classList.toggle("active", b === btn));
+    const isPan = btn.dataset.view === "panorama";
+    document.getElementById("view-review").style.display = isPan ? "none" : "";
+    document.getElementById("view-panorama").style.display = isPan ? "" : "none";
+    if (isPan && !panInited) { initPanCharts(); panInited = true; CHARTS.forEach(c => c.resize()); }
+  });
+document.getElementById("side-foot").textContent = "数据更新于 " + ((R.mkt || {}).date || R.asOf || "—");
+
+/* ---------- 通用小件 ---------- */
+function kpi(label, value, sub, cls) {
+  return `<div class="anchor"><div class="anchor-label">${label}</div>
+    <div class="anchor-value ${cls || ""}" style="font-size:22px">${value}</div>
+    ${sub ? `<div class="anchor-chg ${cls || ""}">${sub}</div>` : ""}</div>`;
+}
+function tblHTML(cols, rows) {
+  return `<table class="tbl"><thead><tr>${cols.map(c => `<th class="${c.num ? "num" : ""}">${c.t}</th>`).join("")}</tr></thead>
+    <tbody>${rows.map(r => `<tr>${r.map((v, i) => `<td class="${cols[i].num ? "num" : ""}">${v}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+}
+const balCell = m => m.bal == null ? "—" :
+  `<span class="${m.bal < 3 ? "small-bal" : ""}" ${m.bal < 3 ? 'title="剩余规模<3亿：流动性偏弱/易受强赎冲击"' : ""}>${m.bal < 3 ? "⚠ " : ""}${fmt2(m.bal)}</span>`;
+
+/* ============================================================ Tab1 复盘 */
+(function renderReview() {
+  const mkt = R.mkt || {};
+  document.getElementById("review-date").textContent = "截面 " + (mkt.date || "—");
+  document.getElementById("mkt-kpis").innerHTML = [
+    kpi("等权涨跌", pct(mkt.retEq), mkt.prevDate ? "vs " + mkt.prevDate : "", updown(mkt.retEq)),
+    kpi("上涨占比", mkt.upRatio == null ? "—" : mkt.upRatio + "%", ""),
+    kpi("中位价", fmt2(mkt.medPrice), "元"),
+    kpi("中位溢价率", fmt2(mkt.medPrem), "%"),
+    kpi("覆盖券数", mkt.n || "—", "只（公募·在交易）"),
+  ].join("");
+
+  /* 走势：等权指数（左轴）+ 中证转债对照 + 中位溢价率（右轴） */
+  const hist = (R.hist || []).filter(h => h.idx != null);
+  const csiMap = new Map(R.csi || []);
+  let csiBase = null;                 // 基期=hist 最后一个有中证数据的日（同基归一 100）
+  for (let i = hist.length - 1; i >= 0; i--)
+    if (csiMap.has(hist[i].d)) { csiBase = csiMap.get(hist[i].d); break; }
+  const csiLine = csiBase ? hist.map(h => {
+    const v = csiMap.get(h.d);
+    return v == null ? null : +(v / csiBase * 100).toFixed(2);
+  }) : [];
+  ch("ch-index", {
+    tooltip: {trigger: "axis"},
+    legend: {data: ["等权指数", ...(csiLine.length ? ["中证转债(对照)"] : []), "中位溢价率%"], top: 0},
+    grid: {left: 46, right: 46, top: 30, bottom: 50},
+    dataZoom: [{type: "inside"}, {type: "slider", height: 16, bottom: 8}],
+    xAxis: {type: "category", data: hist.map(h => h.d),
+            axisLabel: {fontSize: 10, hideOverlap: true, formatter: v => v.slice(5)}},
+    yAxis: [{type: "value", scale: true}, {type: "value", scale: true, splitLine: {show: false}}],
+    series: [
+      {name: "等权指数", type: "line", data: hist.map(h => h.idx), symbol: "none",
+       lineStyle: {width: 2, color: "#1769aa"}},
+      ...(csiLine.length ? [{name: "中证转债(对照)", type: "line", data: csiLine, symbol: "none",
+         connectNulls: true, lineStyle: {width: 1.5, color: "#b7791f"}}] : []),
+      {name: "中位溢价率%", type: "line", data: hist.map(h => h.mpr), symbol: "none", yAxisIndex: 1,
+       lineStyle: {width: 1.5, color: "#9a6500", type: "dashed"}},
+    ]});
+
+  /* 联动散点：x=正股% y=转债%；大小=|转债涨幅|，红涨绿跌 */
+  const all = ((R.movers || {}).all || []).filter(m => m.sk != null);
+  const dotColor = cb => cb > 0 ? "#c2413b" : cb < 0 ? "#1f8a5c" : "#8a97a5";
+  ch("ch-pair", {
+    tooltip: {formatter: p => `${p.data[2]}<br/>转债 ${pct(p.data[1])} · 正股 ${pct(p.data[0])}<br/>价 ${p.data[3]} · 溢价 ${p.data[4]}%`},
+    grid: {left: 46, right: 20, top: 20, bottom: 36},
+    xAxis: {name: "正股%", type: "value", scale: true, nameLocation: "middle", nameGap: 24},
+    yAxis: {name: "转债%", type: "value", scale: true},
+    series: [
+      {type: "scatter", opacity: .55,
+       symbolSize: (v, p) => 4 + 8 * Math.min(Math.abs(p.data[1]) / 8, 1),
+       data: all.map(m => [m.sk, m.cb, m.b, m.p, m.pr]),
+       itemStyle: {color: d => dotColor(d.data[1])}},
+      {type: "line", data: [[-11, -11], [11, 11]], symbol: "none", silent: true,
+       lineStyle: {color: "#587086", type: "dashed", width: 1}}]});
+
+  /* 华泰复盘：日期 tab + 正文 + 风险揭示（skill 合规格式，不截断） */
+  const htsc = R.htsc || [];
+  const tabs = document.getElementById("htsc-tabs");
+  const body = document.getElementById("htsc-body");
+  if (!htsc.length) {
+    tabs.style.display = "none";
+    body.textContent = "未识别到复盘数据（HTSC_APP_KEY 未配置或接口失败）。请前往行知 App 或行知网页版，进入「华泰智研 Skill 及 MCP 专区」，点击「API KEY」查看并配置后重跑 update。";
+    document.getElementById("htsc-risk").textContent = RISK;
+  } else {
+    htsc.forEach((it, i) => {
+      const b = document.createElement("button");
+      b.className = "tab" + (i === 0 ? " active" : "");
+      b.textContent = (it.pubDate || "").slice(5) + " " + (it.title || "").replace(/.*复盘/, "复盘");
+      b.onclick = () => {
+        tabs.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t === b));
+        body.textContent = "复盘日期：" + it.pubDate + "\n\n" + (it.review || "");
+      };
+      tabs.appendChild(b);
+    });
+    body.textContent = "复盘日期：" + htsc[0].pubDate + "\n\n" + (htsc[0].review || "");
+    document.getElementById("htsc-risk").textContent = RISK;
+  }
+
+  /* 情绪指数 & 资金面（华泰智研MCP数据服务） */
+  const extra = R.extra || {};
+  const emo = extra.emotion || [];
+  if (emo.length) {
+    document.getElementById("emo-date").textContent = emo[emo.length - 1][0].slice(5);
+    ch("ch-emo", {
+      tooltip: {trigger: "axis"},
+      grid: {left: 46, right: 16, top: 20, bottom: 24},
+      xAxis: {type: "category", data: emo.map(e => e[0]),
+              axisLabel: {fontSize: 10, hideOverlap: true, formatter: v => v.slice(5)}},
+      yAxis: {type: "value", scale: true, name: "情绪指数"},
+      series: [{type: "line", data: emo.map(e => e[1]), symbol: "none",
+                lineStyle: {width: 2, color: "#1769aa"},
+                areaStyle: {color: "rgba(23,105,170,.08)"}}]});
+  } else {
+    document.getElementById("ch-emo").innerHTML = `<div class="empty">本期未获取（接口失败或未配置）</div>`;
+  }
+  document.getElementById("emo-risk").textContent = RISK;
+  const cap = extra.capital || [];
+  const capDs = cap.map(c => String(c[1])).filter(s => /^\d{4}-\d{2}-\d{2}$/.test(s)).sort();
+  document.getElementById("cap-date").textContent = capDs.length ? capDs[capDs.length - 1].slice(5) : "—";
+  document.getElementById("tbl-capital").innerHTML = cap.length
+    ? tblHTML([{t: "指标"}, {t: "最新值", num: 1}, {t: "日期", num: 1}],
+        cap.map(c => [c[0], `<span class="${updown(c[2])}">${(c[2] > 0 ? "+" : "") + c[2]}</span> ${c[3] || ""}`,
+                      String(c[1]).slice(5)]))
+    : `<div class="empty">本期未获取（接口失败或未配置）</div>`;
+  document.getElementById("cap-risk").textContent = RISK;
+
+  /* 涨跌榜（联动对照） */
+  const cols = [{t: "转债"}, {t: "价格", num: 1}, {t: "转债%", num: 1}, {t: "正股%", num: 1},
+                {t: "溢价率%", num: 1}, {t: "双低", num: 1}];
+  const rows = list => (list || []).map(m =>
+    [`<span class="strong">${m.b}</span>`, fmt2(m.p),
+     `<span class="${updown(m.cb)}">${pct(m.cb)}</span>`,
+     m.sk == null ? "—" : `<span class="${updown(m.sk)}">${pct(m.sk)}</span>`,
+     fmt2(m.pr), fmt2(m.dl)]);
+  document.getElementById("tbl-top").innerHTML = tblHTML(cols, rows((R.movers || {}).top));
+  document.getElementById("tbl-bottom").innerHTML = tblHTML(cols, rows((R.movers || {}).bottom));
+})();
+
+/* ============================================================ Tab2 全景 */
+(function renderPanorama() {
+  const kpiD = P.kpi || {};
+  document.getElementById("pan-date").textContent = "截面 " + (P.asOf || "—");
+  const strat = P.strat || {}, rg = strat.regime || {};
+  document.getElementById("pan-kpis").innerHTML = [
+    kpi("覆盖券数", kpiD.n || "—", "只"),
+    kpi("中位价", fmt2(kpiD.medPrice), "元"),
+    kpi("中位溢价率", fmt2(kpiD.medPrem), "%"),
+    kpi("纯债溢价中位", fmt2(kpiD.medDbPrem), "%"),
+    kpi("中位YTM", fmt2(kpiD.medYtm), "%"),
+    kpi("双低中位", fmt2(kpiD.medDualLow), ""),
+    kpi("<110元券数", kpiD.below110 == null ? "—" : kpiD.below110 + " 只", `<span class="flat">百元下 ${kpiD.below100 ?? "—"} 只</span>`),
+    `<div class="anchor"><div class="anchor-label">周期判定</div>
+     <div><span class="regime-chip ${rg.strong ? "regime-strong" : "regime-weak"}">${rg.strong ? "强周期" : "弱周期"}</span>
+     <span class="anchor-chg flat" style="display:block;margin-top:3px">动量 ${fmt2(rg.momentum)}% · 温度 ${fmt2(rg.temperature)}</span></div></div>`,
+  ].join("");
+
+  /* 策略雷达四榜（附剩余规模，<3亿标⚠） */
+  const defs = [
+    {k: "dual_low", t: "双低（攻守均衡）", note: "现价≤125，双低=价+溢价率 升序 Top20"},
+    {k: "low_price", t: "低价高YTM（债性防御）", note: "90-115 元且 YTM≥0，按 YTM 降序 Top20"},
+    {k: "low_premium", t: "低溢价（偏股进攻）", note: "溢价 -8~10pp 且平价≥90，按溢价升序 Top20"},
+    {k: "beta_offense", t: "正股高Beta进攻", note: "正股 120 日 beta≥1.1 且平价≥90、价≤150（弱周期自动缺席）"},
+  ];
+  const sTabs = document.getElementById("strat-tabs");
+  const sTbl = document.getElementById("strat-tbl");
+  document.getElementById("strat-note").textContent =
+    `当前 ${rg.strong ? "强" : "弱"}周期 → 主榜 ${rg.strong ? "低溢价 / 高Beta" : "双低 / 低价"}；已公告赎回/回售中的券自动剔除（黑名单）；余额<3亿 标 ⚠（流动性偏弱/易受强赎冲击）`;
+  document.getElementById("strat-badge").textContent = "skill 策略雷达规则 · 财汇本地";
+  function showStrat(k) {
+    const list = strat[k] || [];
+    const cols = [{t: "转债"}, {t: "价格", num: 1}, {t: "平价", num: 1}, {t: "溢价%", num: 1},
+                  {t: "双低", num: 1}, {t: "纯债溢价%", num: 1}, {t: "YTM%", num: 1}, {t: "余额(亿)", num: 1}];
+    if (k === "beta_offense") cols.push({t: "Beta", num: 1});
+    const tbl = tblHTML(cols, list.map(m => [`<span class="strong">${m.b}</span>`, fmt2(m.p), fmt2(m.cv),
+        fmt2(m.pr), fmt2(m.dl), fmt2(m.pb), m.y == null ? "—" : fmt2(m.y), balCell(m),
+        ...(k === "beta_offense" ? [fmt2(m.beta)] : [])]));
+    sTbl.innerHTML = (k === "beta_offense" && !rg.strong)
+      ? `<div class="empty">⚠ 弱周期（动量 ${fmt2(rg.momentum)}%）：进攻榜规则上建议缺席，下表仅供观察</div>` + tbl
+      : (list.length ? tbl : `<div class="empty">本期无入选券</div>`);
+  }
+  defs.forEach((d, i) => {
+    const b = document.createElement("button");
+    b.className = "tab" + (i === 0 ? " active" : "");
+    b.title = d.note;
+    b.textContent = d.t;
+    b.onclick = () => {
+      sTabs.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t === b));
+      showStrat(d.k);
+    };
+    sTabs.appendChild(b);
+  });
+  showStrat("dual_low");
+
+  /* 条款预警：按条款分页，每页列结构差异化（赎回/兑付看关键日，临界看计数进度，
+     下修分 落地/计数中/公告不下修 三组，回售看申报期） */
+  const alerts = P.alerts || [];
+  const md = s => /^\d{4}-\d{2}-\d{2}$/.test(String(s)) ? String(s).slice(5) : "—";
+  const dFull = s => /^\d{4}-\d{2}-\d{2}$/.test(String(s)) ? String(s) : "—";
+  const bar = (c, need) => "▓".repeat(Math.min(c, need)) + "░".repeat(Math.max(need - Math.min(c, need), 0));
+  const stMap = {met: "已满足·待公告", count: "计数中", noredeem: "已公告不赎回", lock: "发行锁定中"};
+  const daysTxt = d => d == null ? "—" : (d >= 0 ? d + " 天" : "已过 " + (-d) + " 天");
+  const nrInfo = a => {
+    if (a.st === "lock" && a.lock) return `发行锁定期至 ${dFull(a.lock)}（条款：发行后 N 月内不赎回）`;
+    if (a.st === "noredeem" && a.nr)
+      return `不赎回公告 ${annLink(a.nr, dFull(a.nr.pub))}` + (a.nr.end ? ` · 重新计数/承诺至 ${dFull(a.nr.end)}` : ` · 自 ${dFull(a.nr.pub)} 起重新计数`);
+    if (a.nr && a.st === "met") return `曾公告不赎回 ${annLink(a.nr, dFull(a.nr.pub))}（承诺已过期）`;
+    return "—";
+  };
+  const nrCommit = a => a.end
+    ? ((new Date(a.end) - new Date(a.pub)) / 864e5 > 60 ? `承诺至 ${dFull(a.end)}` : `${dFull(a.end)} 起重新计数`)
+    : `自 ${dFull(a.pub)} 起重新计数`;
+  const sub = (title, cols, rows) =>
+    `<div style="margin:14px 0 4px;font-size:13px;color:var(--muted)">${title}</div>` +
+    (rows.length ? tblHTML(cols, rows) : `<div class="empty">无</div>`);
+
+  const REDUCE_COLS = [{t: "性质"}, {t: "转债"}, {t: "最后转股日 / 兑付日", num: 1},
+                       {t: "距今", num: 1}, {t: "赎回/兑付价", num: 1}, {t: "停止转股日", num: 1}];
+  const TRIG_COLS = [{t: "转债"}, {t: "强赎计数（30 日观察窗）", num: 1}, {t: "平价", num: 1},
+                     {t: "状态"}, {t: "不赎回 / 锁定"}];
+  const PUT_COLS = [{t: "转债"}, {t: "申报期起", num: 1}, {t: "申报期止", num: 1}, {t: "距开窗", num: 1}];
+
+  const annLink = (o, text) => o && o.pdf
+    ? `<a href="http://static.cninfo.com.cn/${o.pdf}" target="_blank" rel="noopener"
+        title="${(o.title || "巨潮公告 PDF").replace(/"/g, "")}"
+        style="color:#1769aa">${text} ↗</a>` : text;
+  const renderAlert = {
+    /* 赎回公告 & 到期兑付：关键日=最后转股日（强赎）/ 兑付日 */
+    redeem(list) {
+      return tblHTML(REDUCE_COLS, list.map(a => [
+        a.lab === "到期兑付" ? "🔵 到期兑付" : "🔴 强赎",
+        `<span class="strong">${a.b}</span>`,
+        dFull(a.key), daysTxt(a.kd), a.px || "—",
+        a.lab === "到期兑付" ? "—" : md(a.stop)]));
+    },
+    /* 强赎临界：条款口径计数进度 + 不赎回/锁定标注 */
+    trig(list) {
+      return tblHTML(TRIG_COLS, list.map(a => [
+        `<span class="strong">${a.b}</span>`,
+        `${bar(a.c, a.need || 15)} ${a.c}/${a.need || 15}` + (a.c >= (a.need || 15) || a.c === 0 ? "" : `（还差 ${a.days} 天）`),
+        fmt2(a.par), stMap[a.st] || a.st, nrInfo(a)]));
+    },
+    /* 下修：落地 / 计数中 / 公告不下修 三组 */
+    revise(list) {
+      let html = sub("🟣 已下修落地（近 45 日）",
+        [{t: "转债"}, {t: "公告日", num: 1}, {t: "生效日", num: 1}, {t: "转股价调整", num: 1}],
+        list.filter(a => a.lvl === "revise").map(a =>
+          [`<span class="strong">${a.b}</span>`, md(a.pub), md(a.eff), a.note]));
+      html += sub("🟣 提议下修（董事会已提议 · 待股东大会）",
+        [{t: "转债"}, {t: "股东大会日", num: 1}, {t: "平价", num: 1}, {t: "价格", num: 1}],
+        list.filter(a => a.lvl === "revprop").map(a =>
+          [`<span class="strong">${a.b}</span>`, dFull(a.meet), fmt2(a.par), fmt2(a.p)]));
+      html += sub("🟣 下修博弈（30 日观察窗内平价 &lt;85 天数 · ≥15 已触发待公司决定 / 10-14 计数中）",
+        [{t: "转债"}, {t: "计数进度（30 日窗）", num: 1}, {t: "平价", num: 1}, {t: "状态"}, {t: "价格", num: 1}],
+        list.filter(a => a.lvl === "revwatch").map(a =>
+          [`<span class="strong">${a.b}</span>`, `${bar(a.c, 15)} ${a.c}/15`, fmt2(a.par),
+           a.prop ? `已提议·股东大会 ${a.prop.replace(/.*：/, "")}`
+                  : (a.days == null ? "已触发·待决定" : `还差 ${a.days} 天`), fmt2(a.p)]));
+      html += sub("🟣 已公告不下修（近 90 日 · 巨潮公告检索）",
+        [{t: "转债"}, {t: "公告日", num: 1}, {t: "承诺期 / 重新计数", num: 1}],
+        list.filter(a => a.lvl === "norevise").map(a =>
+          [`<span class="strong">${a.b}</span>`, annLink(a, md(a.pub)), nrCommit(a)]));
+      return html;
+    },
+    /* 回售：申报期窗口 */
+    put(list) {
+      return tblHTML(PUT_COLS, list.map(a => [
+        `<span class="strong">${a.b}</span>`, md(a.beg), md(a.end),
+        a.days >= 0 ? daysTxt(a.days) : "进行中（已开 " + (-a.days) + " 天）"]));
+    },
+  };
+
+  const aDefs = [
+    {k: "redeem", t: "赎回 / 兑付", f: a => a.lvl === "red" || a.lvl === "orange"},
+    {k: "trig", t: "🟡 强赎临界", f: a => a.lvl === "yellow"},
+    {k: "revise", t: "🟣 下修", f: a => ["revise", "revprop", "revwatch", "norevise"].includes(a.lvl)},
+    {k: "put", t: "ℹ️ 回售窗口", f: a => a.lvl === "info"},
+  ];
+  const aTabs = document.getElementById("alert-tabs");
+  function showAlerts(k) {
+    const d = aDefs.find(x => x.k === k);
+    const list = alerts.filter(d.f);
+    document.getElementById("tbl-alerts").innerHTML =
+      list.length ? renderAlert[k](list) : `<div class="empty">本期无此类预警</div>`;
+  }
+  aDefs.forEach((d, i) => {
+    const b = document.createElement("button");
+    b.className = "tab" + (i === 0 ? " active" : "");
+    b.textContent = d.t;
+    b.onclick = () => {
+      aTabs.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t === b));
+      showAlerts(d.k);
+    };
+    aTabs.appendChild(b);
+  });
+  showAlerts("redeem");
+})();
+
+/* ---------- Tab2 图表（首次切换时初始化，避免隐藏容器尺寸 0） ---------- */
+function initPanCharts() {
+  const P2 = P;
+  /* 价格分布 */
+  const dist = P2.dist || {};
+  ch("ch-dist", {
+    tooltip: {}, grid: {left: 40, right: 16, top: 16, bottom: 30},
+    xAxis: {type: "category", data: Object.keys(dist), axisLabel: {fontSize: 10, interval: 0, rotate: 30}},
+    yAxis: {type: "value"},
+    series: [{type: "bar", data: Object.values(dist), barWidth: "60%",
+              itemStyle: {color: "#1769aa", borderRadius: [3, 3, 0, 0]},
+              label: {show: true, position: "top", fontSize: 10}}]});
+
+  /* 平价带溢价中位 */
+  const bands = P2.bands || [];
+  ch("ch-bands", {
+    tooltip: {trigger: "axis"}, grid: {left: 40, right: 40, top: 30, bottom: 30},
+    legend: {data: ["溢价率中位%", "券数"], top: 0},
+    xAxis: {type: "category", data: bands.map(b => b.band), axisLabel: {fontSize: 10, interval: 0, rotate: 30}},
+    yAxis: [{type: "value"}, {type: "value", splitLine: {show: false}}],
+    series: [
+      {name: "溢价率中位%", type: "line", data: bands.map(b => b.prem), symbolSize: 7,
+       connectNulls: true,
+       lineStyle: {color: "#1769aa", width: 2}, itemStyle: {color: "#1769aa"}},
+      {name: "券数", type: "bar", yAxisIndex: 1, data: bands.map(b => b.n),
+       barWidth: "45%", itemStyle: {color: "#c9dced"}}]});
+
+  /* 平价-溢价全景散点（色=价格） */
+  const sc = P2.scatter || [];
+  ch("ch-scatter", {
+    tooltip: {formatter: p => `平价 ${p.data[0]} · 溢价 ${p.data[1]}%<br/>转债价 ${p.data[2]}`},
+    grid: {left: 46, right: 130, top: 20, bottom: 36},
+    xAxis: {name: "转股价值(平价)", type: "value", nameLocation: "middle", nameGap: 26},
+    yAxis: {name: "转股溢价率%", type: "value"},
+    visualMap: {min: 90, max: 200, calculable: true, orient: "vertical", right: 10, top: "center",
+                text: ["价高", "价低"], inRange: {color: ["#16865c", "#1769aa", "#b7791f", "#c24135"]}},
+    series: [{type: "scatter", symbolSize: 7, data: sc, itemStyle: {opacity: .75}}]});
+
+  /* 正股一级行业景气度（横向条形，降序） */
+  const ind = P2.ind || [];
+  if (ind.length) {
+    document.getElementById("ind-date2").textContent = ind[0].d;
+    document.getElementById("ind-date").textContent = "景气期：" + ind[0].d + "（0-100）";
+    const srt = [...ind].sort((a, b) => a.v - b.v);   // 横向条形：值小的在下
+    ch("ch-ind", {
+      tooltip: {},
+      grid: {left: 90, right: 40, top: 10, bottom: 24},
+      xAxis: {type: "value"},
+      yAxis: {type: "category", data: srt.map(i => i.n), axisLabel: {fontSize: 11}},
+      series: [{type: "bar", data: srt.map(i => i.v), barWidth: "62%",
+                label: {show: true, position: "right", fontSize: 10},
+                itemStyle: {color: p => p.value >= 55 ? "#c2413b" : p.value >= 45 ? "#1769aa" : "#5c8db7",
+                            borderRadius: [0, 3, 3, 0]}}]});
+  } else {
+    document.getElementById("ch-ind").innerHTML = `<div class="empty">本期未获取（接口失败或未配置）</div>`;
+  }
+  document.getElementById("ind-risk").textContent = RISK;
+}
+</script>
+</body>
+</html>

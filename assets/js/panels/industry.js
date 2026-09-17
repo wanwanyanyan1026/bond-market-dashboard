@@ -21,7 +21,7 @@
      存在才出第二 tab）；子页视图并入本文件系 V 盘屏蔽新建 .js（只能原地改写）
    */
 
-let _subView = "quotes";   // 子分页当前视图（面板内会话级保留）
+let _subView = "prosp";   // 子分页当前视图（会话级保留；默认先看景气度×行业利差）
 
 PANELS["industry"] = {
   title: "行业高频",
@@ -123,7 +123,7 @@ function renderQuotes(root) {
       gap: "8px", position: "sticky", top: "8px", zIndex: "5", background: "var(--bg)",
       padding: "10px 12px", border: "1px solid var(--line-soft)",
       borderRadius: "var(--radius)", marginBottom: "16px"}}, []);
-    const chipEls = {}, cardEls = {};
+    const chipEls = {}, cardEls = {}, bodyEls = {}, chevEls = {}, tableRows = {}, secHeads = [];
     function setActive(g) {
       NAMES.forEach((n) => {
         const on = n === g, c = chipEls[n];
@@ -133,6 +133,40 @@ function renderQuotes(root) {
       });
     }
     const sectors = (D.industry && D.industry.sectors) || {};
+
+    /* 展示优化（2026-09-17）：①公司观察 6 组并成一张 tab 卡（tab 显各主体分值，只渲染
+       激活主体表格）；②普通组卡默认折叠为一行（组名+分值+最强最弱摘要），点头部展开，
+       localStorage 记忆展开集；③品种搜索框跨组过滤行、隐藏空组（公司卡自动切主体 tab） */
+    const BANDS = [                                         // [下界, 底色, 字色] 8 档色阶（矩阵共用）
+      [87.5, "#b71c1c", "#fff"], [75, "#e57373", "#fff"], [62.5, "#ffcdd2", "#26221f"],
+      [50, "#fff9c4", "#26221f"], [37.5, "#d3e8ae", "#26221f"], [25, "#a5d6a7", "#1c4020"],
+      [12.5, "#66bb6a", "#0b3d0f"], [-Infinity, "#1b5e20", "#fff"],
+    ];
+    const deltaTag = (sc, sp) => {                 // 纵向变化箭头：较一月前分值（|Δ|<1 视平不显）
+      if (sc === null || sc === undefined || sp === null || sp === undefined) return null;
+      const d = Math.round((sc - sp) * 10) / 10;
+      if (Math.abs(d) < 1) return null;
+      return h("span", {title: "较一月前 " + sp + " → " + sc,
+        style: {fontSize: "11px", verticalAlign: "1px", color: d > 0 ? "#c62828" : "#2e7d32"}},
+        [d > 0 ? "▲+" + d : "▼" + d]);
+    };
+    const scoreChip = (sc, sp) => {
+      const b = (sc === null || sc === undefined) ? null : BANDS.find(([lo]) => sc >= lo);
+      return h("span", {style: {whiteSpace: "nowrap"}}, [
+        h("span", {style: {minWidth: "36px", textAlign: "center", padding: "0 8px",
+          borderRadius: "999px", fontSize: "12px", fontWeight: "700", lineHeight: "20px",
+          display: "inline-block", background: b ? b[1] : "var(--surface-soft)",
+          color: b ? b[2] : "var(--muted)"}},
+          [sc === null || sc === undefined ? "—" : sc]),
+        deltaTag(sc, sp)]);
+    };
+    const COMP = NAMES.filter((g) => sectors[g] === "公司观察");   // 公司观察组（config 连续置尾）
+    const EXPKEY = "ind_expand_v1";                          // 折叠记忆：{组名: true=展开}
+    let expanded = {};
+    try { expanded = JSON.parse(localStorage.getItem(EXPKEY) || "{}") || {}; } catch (e) {}
+    const saveExp = () => { try { localStorage.setItem(EXPKEY, JSON.stringify(expanded)); } catch (e) {} };
+    let drawComp = null, compCur = null;                     // 公司卡激活主体切换（建卡后赋值）
+
     let lastSec = "";
     NAMES.forEach((g) => {
       const list = Array.isArray(groups[g].indicators) ? groups[g].indicators : [];
@@ -140,34 +174,108 @@ function renderQuotes(root) {
       const sec = sectors[g] || "";
       if (sec && sec !== lastSec) {                       // 产业链分区头（组序已按 上游→中游→下游）
         lastSec = sec;
-        root.append(h("div", {class: "sector-head",
+        const head = h("div", {class: "sector-head",
           style: {margin: "20px 0 -6px", fontWeight: "700", fontSize: "13px",
-                  color: "var(--muted)", letterSpacing: "2px"}}, ["— " + sec + " —"]));
+                  color: "var(--muted)", letterSpacing: "2px"}}, ["— " + sec + " —"]);
+        secHeads.push({el: head, sec});
+        root.append(head);
       }
 
       const chip = h("button", {class: "chip", style: empty ? {opacity: "0.55"} : null,
         title: empty ? "该组暂无接口数据" : g,
-        onclick: () => cardEls[g].scrollIntoView({behavior: "smooth", block: "start"})}, [g]);
+        onclick: () => {
+          if (COMP.includes(g) && drawComp) drawComp(g);   // 公司观察 chip：切到该主体
+          else if (!expanded[g]) toggleG(g, true);         // 折叠组 chip：顺带展开
+          cardEls[g].scrollIntoView({behavior: "smooth", block: "start"});
+        }}, [g]);
       chipEls[g] = chip;
       chipBar.append(chip);
 
+      if (COMP.includes(g)) {                              // —— 公司观察：仅首组渲染合并 tab 卡 ——
+        if (g !== COMP[0]) return;
+        const compTabs = h("div", {style: {display: "flex", flexWrap: "wrap", gap: "6px",
+          margin: "2px 0 10px"}}, []);
+        const compBox = h("div", {});
+        const badgeSlot = h("span", {}, []);
+        drawComp = (cg) => {
+          compCur = cg;
+          compTabs.querySelectorAll("button").forEach((b) => {
+            const on = b.dataset.g === cg;
+            b.style.background = on ? "var(--blue)" : "var(--surface-soft)";
+            b.style.color = on ? "#fff" : "var(--text)";
+            b.style.fontWeight = on ? "600" : "";
+          });
+          const l = Array.isArray(groups[cg].indicators) ? groups[cg].indicators : [];
+          compBox.innerHTML = "";
+          if (l.length) tableRows[cg] = buildTable(cg, compBox, l);
+          else compBox.append(h("div", {class: "empty"}, ["该主体组接口暂无数据"]));
+          badgeSlot.innerHTML = "";
+          badgeSlot.append(l.length ? App.badge(srcOf(cg), fetchedAt) : App.badge("manual_inputs"));
+        };
+        COMP.forEach((cg) => {
+          const sc = groups[cg] && groups[cg].score;
+          const sp = groups[cg] && groups[cg].score_1m;
+          const b = (sc === null || sc === undefined) ? null : BANDS.find(([lo]) => sc >= lo);
+          compTabs.append(h("button", {"data-g": cg, onclick: () => drawComp(cg),
+            title: cg + " 景气分 " + (sc === null || sc === undefined ? "—" : sc)
+              + (sp === null || sp === undefined ? "" : "（一月前 " + sp + "）"),
+            style: {padding: "3px 12px", borderRadius: "999px", fontSize: "12px",
+                    cursor: "pointer", border: "1px solid var(--line-soft)",
+                    background: "var(--surface-soft)"}},
+            [cg.replace(/观察$/, "") + " ",
+             h("b", {style: {color: b ? b[1] : "var(--muted)"}},
+               [sc === null || sc === undefined ? "—" : sc]),
+             deltaTag(sc, sp)]));
+        });
+        const card = h("section", {class: "card", "data-group": "公司观察",
+          style: {scrollMarginTop: "72px"}}, [
+          h("h3", {class: "card-title"}, ["公司观察", badgeSlot]),
+          h("p", {class: "card-sub"},
+            ["六主体共用一卡，点主体名切换 · 分值=组内品种动量近3年历史分位均值（0-100，成本·前缀反向计分：分高=毛利扩张）"
+              + " · 各主体品种篮子不同，分值仅供同主体纵向跟踪，跨主体不可直接对比 · ▲▼=较一月前变化"]),
+          compTabs, compBox]);
+        COMP.forEach((cg) => { cardEls[cg] = card; });
+        root.append(card);
+        drawComp(COMP[0]);
+        return;
+      }
+
+      /* —— 普通组：折叠卡，头部一行 = 组名+分值 chip+最强最弱摘要+更新 badge —— */
       const box = h("div", {});
+      const on = !!expanded[g];
+      const chev = h("span", {style: {fontSize: "13px", color: "var(--muted)"}}, [on ? "▾" : "▸"]);
+      const scs = list.filter((r) => r.score !== null && r.score !== undefined);
+      let sumTxt = "";
+      if (scs.length >= 2) {
+        const hi = scs.reduce((a, b) => (b.score > a.score ? b : a));
+        const lo = scs.reduce((a, b) => (b.score < a.score ? b : a));
+        sumTxt = "强 " + (hi.name || hi.key) + " " + hi.score
+               + " ｜ 弱 " + (lo.name || lo.key) + " " + lo.score;
+      } else if (scs.length === 1) {
+        sumTxt = (scs[0].name || scs[0].key) + " " + scs[0].score;
+      }
+      const body = h("div", {style: {display: on ? "" : "none"}}, [
+        empty ? h("div", {class: "empty"}, ["该组数据走手工维护（manual_inputs），接口暂无"]) : null,
+        empty ? null : h("p", {class: "card-sub"},
+            ["点击行查看价格历史与季节性 · 环比为数值涨跌（▲红 / ▼绿），非债市多空语义"]),
+        empty ? null : box]);
       const card = h("section", {class: "card", "data-group": g, style: {scrollMarginTop: "72px"}}, [
-        h("h3", {class: "card-title"}, [g,
-          sec ? h("span", {style: {marginLeft: "8px", fontSize: "11px", fontWeight: "400",
-            padding: "0 7px", borderRadius: "999px", lineHeight: "18px", verticalAlign: "2px",
-            background: "var(--surface-soft)", color: "var(--muted)", letterSpacing: "1px"}},
-            [sec]) : null]),
-        empty ? App.badge("manual_inputs") : App.badge(srcOf(g), fetchedAt),
-        empty
-          ? h("div", {class: "empty"}, ["该组数据走手工维护（manual_inputs），接口暂无"])
-          : h("p", {class: "card-sub"},
-              ["点击行查看价格历史与季节性 · 环比为数值涨跌（▲红 / ▼绿），非债市多空语义"]),
-        empty ? null : box,
-      ]);
-      cardEls[g] = card;
+        h("div", {style: {display: "flex", alignItems: "center", gap: "10px", cursor: "pointer"},
+          onclick: () => toggleG(g)}, [
+          h("h3", {class: "card-title", style: {whiteSpace: "nowrap"}}, [g,
+            sec ? h("span", {style: {marginLeft: "8px", fontSize: "11px", fontWeight: "400",
+              padding: "0 7px", borderRadius: "999px", lineHeight: "18px", verticalAlign: "2px",
+              background: "var(--surface-soft)", color: "var(--muted)", letterSpacing: "1px"}},
+              [sec]) : null,
+            scoreChip(groups[g] && groups[g].score, groups[g] && groups[g].score_1m)]),
+          h("span", {title: sumTxt, style: {flex: "1", fontSize: "12px", color: "var(--muted)",
+            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"}}, [sumTxt]),
+          empty ? App.badge("manual_inputs") : App.badge(srcOf(g), fetchedAt),
+          chev]),
+        body]);
+      cardEls[g] = card; bodyEls[g] = body; chevEls[g] = chev;
       root.append(card);
-      if (!empty) buildTable(g, box, list);
+      if (!empty) tableRows[g] = buildTable(g, box, list);
     });
     /* 当前组高亮：IO 顶部观察带做触发，几何读数定结果——取第一个底部越过
        视口上部 8% 线的卡片（多条同时入带 / 无翻转不回调两类不确定都消除） */
@@ -178,6 +286,78 @@ function renderQuotes(root) {
     }, {rootMargin: "-8% 0px -70% 0px"});
     NAMES.forEach((g) => io.observe(cardEls[g]));
     setActive(NAMES[0]);
+
+    /* —— 折叠切换 + 品种搜索框（跨组过滤行 / 隐藏空组 / 公司卡自动切主体） —— */
+    function toggleG(g, forceOpen) {
+      const on = forceOpen ? true : !expanded[g];
+      expanded[g] = on; saveExp();
+      if (bodyEls[g]) bodyEls[g].style.display = on ? "" : "none";
+      if (chevEls[g]) chevEls[g].textContent = on ? "▾" : "▸";
+    }
+    const sInput = h("input", {type: "text",
+      placeholder: "搜索品种（铜 / PTA / 电价 / 库存…），跨组过滤",
+      style: {width: "300px", maxWidth: "70vw", padding: "7px 12px", fontSize: "13px",
+        borderRadius: "var(--radius)", border: "1px solid var(--line-soft)",
+        background: "var(--surface)", color: "var(--text)", outline: "none"}});
+    const sCount = h("span", {style: {fontSize: "12px", color: "var(--muted)"}}, []);
+    const searchBar = h("div", {style: {display: "flex", alignItems: "center", gap: "10px",
+      marginBottom: "10px"}}, [sInput, sCount]);
+    const match = (r, q) =>
+      ((r.name || r.key || "") + (r.unit ? "（" + r.unit + "）" : "")).includes(q);
+    function applySearch(q) {
+      q = q.trim();
+      let hits = 0;
+      NAMES.forEach((g) => {
+        if (COMP.includes(g)) return;                       // 公司卡单独处理（只过滤激活主体）
+        const trs = tableRows[g] || [];
+        if (!q) {
+          cardEls[g].style.display = "";
+          trs.forEach((tr) => (tr.style.display = ""));
+          bodyEls[g].style.display = expanded[g] ? "" : "none";
+          chevEls[g].textContent = expanded[g] ? "▾" : "▸";
+          return;
+        }
+        const list = Array.isArray(groups[g].indicators) ? groups[g].indicators : [];
+        let n = 0;
+        trs.forEach((tr, i) => {
+          const m = match(list[i] || {}, q);
+          tr.style.display = m ? "" : "none";
+          if (m) n++;
+        });
+        cardEls[g].style.display = n ? "" : "none";
+        if (n) { bodyEls[g].style.display = ""; chevEls[g].textContent = "▾"; hits += n; }
+      });
+      if (COMP.length && drawComp) {                        // 公司卡：命中他主体自动切 tab
+        const compCard = cardEls[COMP[0]];
+        if (!q) {
+          compCard.style.display = "";
+          (tableRows[compCur] || []).forEach((tr) => (tr.style.display = ""));
+        } else {
+          const target = COMP.find((cg) =>
+            (Array.isArray(groups[cg].indicators) ? groups[cg].indicators : [])
+              .some((r) => match(r, q)));
+          if (target && target !== compCur) drawComp(target);
+          const l = Array.isArray(groups[compCur].indicators) ? groups[compCur].indicators : [];
+          let n = 0;
+          (tableRows[compCur] || []).forEach((tr, i) => {
+            const m = match(l[i] || {}, q);
+            tr.style.display = m ? "" : "none";
+            if (m) n++;
+          });
+          hits += n;
+          compCard.style.display = n ? "" : "none";
+        }
+      }
+      secHeads.forEach(({el, sec}) => {                     // 分区头：区内无可见组则隐藏
+        const vis = (COMP.length && sec === sectors[COMP[0]]
+            && cardEls[COMP[0]].style.display !== "none")
+          || NAMES.some((g) => sectors[g] === sec && !COMP.includes(g)
+            && cardEls[g] && cardEls[g].style.display !== "none");
+        el.style.display = vis ? "" : "none";
+      });
+      sCount.textContent = q ? (hits ? "命中 " + hits + " 项" : "无命中") : "";
+    }
+    sInput.addEventListener("input", () => applySearch(sInput.value));
 
     /* —— 报价表：Charts.table + 返回 tr 后处理（环比列着色 / 周频标签 / 走势列） —— */
     function buildTable(g, box, list) {
@@ -217,16 +397,14 @@ function renderQuotes(root) {
             [r.freq === "M" ? "月频" : r.freq + "频"]));
         }
       });
+      return trs;                                            // 供搜索框按行过滤（显隐）
     }
 
     root.prepend(chipBar);                                  // 卡片已 append，chip 条置顶
+    root.prepend(searchBar);                                // 搜索框再置顶（chip 条之上）
 
-    /* —— 行业景气度矩阵：组分位 0-100，A股惯例红=强 / 绿=弱，点击跳组卡 —— */
-    const BANDS = [                                         // [下界, 底色, 字色] 8 档色阶
-      [87.5, "#b71c1c", "#fff"], [75, "#e57373", "#fff"], [62.5, "#ffcdd2", "#26221f"],
-      [50, "#fff9c4", "#26221f"], [37.5, "#d3e8ae", "#26221f"], [25, "#a5d6a7", "#1c4020"],
-      [12.5, "#66bb6a", "#0b3d0f"], [-Infinity, "#1b5e20", "#fff"],
-    ];
+    /* —— 行业景气度矩阵：组分位 0-100，A股惯例红=强 / 绿=弱，点击跳组卡
+       （BANDS 8 档色阶已上移至组卡区，与折叠摘要分值 chip 共用） —— */
     const scored = NAMES.map((g) => ({g, sc: groups[g] && groups[g].score}))
       .sort((a, b) => (b.sc === null || b.sc === undefined ? -1 : b.sc)
         - (a.sc === null || a.sc === undefined ? -1 : a.sc));
@@ -239,7 +417,11 @@ function renderQuotes(root) {
       const b = (sc === null || sc === undefined) ? null : BANDS.find(([lo]) => sc >= lo);
       grid.append(h("button", {
         title: (sectors[g] || "") + (parts ? " · " + parts : " · 无可打分品种"),
-        onclick: () => cardEls[g].scrollIntoView({behavior: "smooth", block: "start"}),
+        onclick: () => {
+          if (COMP.includes(g) && drawComp) drawComp(g);    // 公司观察格：先切到该主体
+          else if (!expanded[g]) toggleG(g, true);          // 折叠组顺带展开
+          cardEls[g].scrollIntoView({behavior: "smooth", block: "start"});
+        },
         style: {textAlign: "left", padding: "8px 10px", borderRadius: "var(--radius)",
                 cursor: "pointer", border: "1px solid var(--line-soft)",
                 background: b ? b[1] : "var(--surface-soft)",
