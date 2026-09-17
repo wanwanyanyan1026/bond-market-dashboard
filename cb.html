@@ -26,6 +26,16 @@
 .regime-strong { background: #fdeaea; color: var(--danger); }
 .regime-weak { background: #e8f6f0; color: var(--success); }
 .small-bal { color: var(--warning, #b7791f); font-weight: 600; }
+/* 市场温度计卡 */
+.temp-grid { display: flex; gap: 26px; align-items: center; flex-wrap: wrap; margin-top: 4px; }
+.temp-left { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.temp-dims { flex: 1; min-width: 340px; display: flex; flex-direction: column; gap: 8px; }
+.dim-row { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+.dim-name { width: 60px; color: var(--muted); text-align: right; flex: none; }
+.dim-bar { flex: 1; height: 8px; background: var(--line, #e8edf2); border-radius: 4px; overflow: hidden; }
+.dim-fill { display: block; height: 100%; border-radius: 4px; }
+.dim-val { width: 215px; white-space: nowrap; color: var(--text); flex: none; }
+.temp-verdict { font-size: 13px; text-align: center; line-height: 1.8; }
 </style>
 </head>
 <body>
@@ -50,6 +60,20 @@
     <div class="badge">财汇数据库 · 估值表（公募转债，已剔EB）</div>
     <div class="card-title">市场概览</div>
     <div class="kpi-row" id="mkt-kpis"></div>
+  </div>
+
+  <div class="card" id="temp-card">
+    <div class="badge">六维加权 0–100 · 主温度=转债价≥MA20 占比（四温度带）· 正股池=转债正股（后复权）· 估值=中位溢价率一年分位（反向）· 情绪=A股情绪指数90日分位</div>
+    <div class="card-title">市场温度 · 攻守研判</div>
+    <div class="temp-grid">
+      <div class="temp-left">
+        <div id="ch-gauge" style="width:250px;height:200px"></div>
+        <div class="temp-verdict" id="temp-verdict"></div>
+      </div>
+      <div class="temp-dims" id="temp-dims"></div>
+    </div>
+    <div class="chart" id="ch-temp" style="height:215px"></div>
+    <div class="risk-note">口径：温度带阈值 10/25/50（% 券价≥MA20）；总分 ≥65 进攻 / 45–65 中性 / &lt;45 防守；估值分位高（贵）压低总分、宽度动量取主温度 5 日变化。方法为量化规则，仅供研究参考，不构成投资建议。</div>
   </div>
 
   <div class="card">
@@ -95,6 +119,19 @@
       <div class="card-title">当日跌幅榜 Top15</div>
       <div id="tbl-bottom"></div>
     </div>
+  </div>
+
+  <div class="card">
+    <div class="badge" id="rot-badge">申万一级 · 全A等权</div>
+    <div class="card-title">当日行业轮动（申万一级 · 等权）</div>
+    <div class="chart" id="ch-rot" style="height:480px"></div>
+  </div>
+
+  <div class="card">
+    <div class="badge" id="thm-badge">同花顺概念 · 等权</div>
+    <div class="card-title">当日热点主题</div>
+    <div class="card-sub" id="thm-note"></div>
+    <div id="tbl-themes"></div>
   </div>
 </section>
 
@@ -152,7 +189,7 @@
 
 </main>
 
-<script src="assets/data/data.js?v=cb-21"></script>
+<script src="assets/data/data.js?v=cb-26"></script>
 <script src="assets/js/echarts.min.js"></script>
 <script>
 /* ============================================================
@@ -214,6 +251,52 @@ const balCell = m => m.bal == null ? "—" :
     kpi("中位溢价率", fmt2(mkt.medPrem), "%"),
     kpi("覆盖券数", mkt.n || "—", "只（公募·在交易）"),
   ].join("");
+
+  /* 市场温度计：仪表 + verdict + 六维条 + 温度时序（四温度带色带） */
+  const T = R.temp;
+  if (!T) {
+    document.getElementById("temp-card").style.display = "none";
+  } else {
+    const vc = ({"进攻": "#c2413b", "中性": "#b7791f", "防守": "#1f8a5c"})[T.verdict] || "#667";
+    ch("ch-gauge", {
+      series: [{type: "gauge", startAngle: 210, endAngle: -30, min: 0, max: 100,
+        radius: "96%", center: ["50%", "60%"],
+        progress: {show: true, width: 13, itemStyle: {color: vc}},
+        axisLine: {lineStyle: {width: 13, color: [[1, "#e8edf2"]]}},
+        axisTick: {show: false}, splitLine: {show: false}, axisLabel: {show: false},
+        pointer: {show: false}, anchor: {show: false},
+        title: {offsetCenter: [0, "38%"], fontSize: 12, color: "#889"},
+        detail: {offsetCenter: [0, "-4%"], fontSize: 36, fontWeight: 700, color: vc,
+                 formatter: v => v.toFixed(0)},
+        data: [{value: T.total, name: "综合温度（0-100）"}]}]});
+    document.getElementById("temp-verdict").innerHTML =
+      `<span class="regime-chip" style="background:${vc};color:#fff">${T.verdict}</span>` +
+      `<div style="margin-top:5px">建议仓位 <b>${T.pos}</b> · 当前<b>${T.band}</b>（转债温度 ${fmt2(T.cbTemp)}%）</div>` +
+      `<div style="color:var(--muted)">${T.strategy}</div>`;
+    const DC = {breadth: "#7c4dbe", trend: "#1769aa", stock: "#1f8a5c",
+                emotion: "#d6336c", valuation: "#b7791f", momentum: "#0e9aa0"};
+    document.getElementById("temp-dims").innerHTML = (T.dims || []).map(d => {
+      const p = Math.max(0, Math.min(100, Math.round(d.score / d.max * 100)));
+      return `<div class="dim-row"><span class="dim-name">${d.name}</span>
+        <span class="dim-bar"><span class="dim-fill" style="width:${p}%;background:${DC[d.key] || "#889"}"></span></span>
+        <span class="dim-val">${d.score.toFixed(1)}/${d.max} · ${d.note}</span></div>`;
+    }).join("");
+    const h = T.hist || [];
+    ch("ch-temp", {
+      tooltip: {trigger: "axis"},
+      grid: {left: 40, right: 14, top: 18, bottom: 22},
+      xAxis: {type: "category", data: h.map(x => x[0]),
+              axisLabel: {fontSize: 10, hideOverlap: true, formatter: v => v.slice(5)}},
+      yAxis: {type: "value", min: 0, max: 100},
+      series: [{name: "转债温度%", type: "line", data: h.map(x => x[1]), symbol: "none",
+                lineStyle: {width: 2, color: "#1769aa"},
+                markArea: {silent: true, label: {fontSize: 10, position: "insideTop", color: "#667"},
+                  data: [[{yAxis: 0, itemStyle: {color: "#1f8a5c", opacity: .12}, label: {formatter: "冰点/黄金坑"}}, {yAxis: 10}],
+                         [{yAxis: 10, itemStyle: {color: "#1769aa", opacity: .10}}, {yAxis: 25}],
+                         [{yAxis: 25, itemStyle: {color: "#b7791f", opacity: .12}}, {yAxis: 50}],
+                         [{yAxis: 50, itemStyle: {color: "#c2413b", opacity: .12}, label: {formatter: "过热"}}, {yAxis: 100}]]}}]});
+  }
+
 
   /* 走势：等权指数（左轴）+ 中证转债对照 + 中位溢价率（右轴） */
   const hist = (R.hist || []).filter(h => h.idx != null);
@@ -309,16 +392,55 @@ const balCell = m => m.bal == null ? "—" :
     : `<div class="empty">本期未获取（接口失败或未配置）</div>`;
   document.getElementById("cap-risk").textContent = RISK;
 
-  /* 涨跌榜（联动对照） */
-  const cols = [{t: "转债"}, {t: "价格", num: 1}, {t: "转债%", num: 1}, {t: "正股%", num: 1},
+  /* 涨跌榜（联动对照 + 申万行业） */
+  const indCell = m => m.ind ? `<span style="font-size:11px;color:var(--muted)">${m.ind}</span>` : "—";
+  const cols = [{t: "转债"}, {t: "行业"}, {t: "价格", num: 1}, {t: "转债%", num: 1}, {t: "正股%", num: 1},
                 {t: "溢价率%", num: 1}, {t: "双低", num: 1}];
   const rows = list => (list || []).map(m =>
-    [`<span class="strong">${m.b}</span>`, fmt2(m.p),
+    [`<span class="strong">${m.b}</span>`, indCell(m), fmt2(m.p),
      `<span class="${updown(m.cb)}">${pct(m.cb)}</span>`,
      m.sk == null ? "—" : `<span class="${updown(m.sk)}">${pct(m.sk)}</span>`,
      fmt2(m.pr), fmt2(m.dl)]);
   document.getElementById("tbl-top").innerHTML = tblHTML(cols, rows((R.movers || {}).top));
   document.getElementById("tbl-bottom").innerHTML = tblHTML(cols, rows((R.movers || {}).bottom));
+
+  /* 行业轮动：申万一级当日等权（红涨绿跌，tooltip 5日+成分数） */
+  const rot = R.rotation;
+  if (rot && (rot.rows || []).length) {
+    document.getElementById("rot-badge").textContent =
+      `申万一级 · 全A等权 · ${(rot.date || "").slice(5)}`;
+    const rs = rot.rows;
+    ch("ch-rot", {
+      tooltip: {formatter: p => `${p.name}<br>当日 ${pct(p.value)} · 近5日 ${pct(rs[p.dataIndex].c5)} · 成分 ${rs[p.dataIndex].k} 只`},
+      grid: {left: 76, right: 34, top: 10, bottom: 26},
+      xAxis: {type: "value", axisLabel: {formatter: v => v + "%"}},
+      yAxis: {type: "category", inverse: true, data: rs.map(r => r.n), axisLabel: {fontSize: 11}},
+      series: [{type: "bar", data: rs.map(r => ({value: r.c,
+                itemStyle: {color: r.c > 0 ? "#c2413b" : r.c < 0 ? "#1f8a5c" : "#8a97a5"}}))}]});
+  } else {
+    document.getElementById("ch-rot").innerHTML = `<div class="empty">本期未生成（行情/行业映射缺失）</div>`;
+  }
+
+  /* 热点主题：概念 → 领涨股(转债后缀) + 概念内转债 */
+  const thm = R.themes;
+  if (thm && (thm.rows || []).length) {
+    document.getElementById("thm-badge").textContent =
+      `同花顺概念 · 等权 · ${(thm.date || "").slice(5)} · 成分快照 ${(thm.snapDate || "—").slice(5)}`;
+    document.getElementById("thm-note").textContent =
+      "领涨股有存续转债的以 [转债名] 标注；催化与盘面解读见上方 A股复盘全文（第三方券商观点）。";
+    document.getElementById("tbl-themes").innerHTML = tblHTML(
+      [{t: "主题"}, {t: "当日%", num: 1}, {t: "5日%", num: 1}, {t: "涨停", num: 1},
+       {t: "领涨股"}, {t: "概念内转债"}],
+      thm.rows.map(t => [
+        `<span class="strong">${t.name}</span>`,
+        `<span class="${updown(t.c)}">${pct(t.c)}</span>`,
+        `<span class="${updown(t.c5)}">${pct(t.c5)}</span>`,
+        t.lim ? String(t.lim) : "0",
+        (t.leads || []).map(l => `${l.skn}${l.cb ? ` <span style="font-size:11px;color:var(--muted)">[${l.cb}]</span>` : ""} <span class="${updown(l.p)}">${pct(l.p)}</span>`).join("<br>"),
+        (t.cbs || []).length ? t.cbs.map(c => `${c.b} <span class="${updown(c.cb)}">${pct(c.cb)}</span> <span style="font-size:11px;color:var(--muted)">(${c.skn} ${pct(c.sp)})</span>`).join("<br>") : "—"]));
+  } else {
+    document.getElementById("tbl-themes").innerHTML = `<div class="empty">本期未生成（概念成分/行情缺失）</div>`;
+  }
 })();
 
 /* ============================================================ Tab2 全景 */
@@ -346,6 +468,7 @@ const balCell = m => m.bal == null ? "—" :
     {k: "low_premium", t: "低溢价（偏股进攻）", note: "溢价 -8~10pp 且平价≥90，按溢价升序 Top20"},
     {k: "beta_offense", t: "正股高Beta进攻", note: "正股 120 日 beta≥1.1 且平价≥90、价≤150（弱周期自动缺席）"},
     {k: "momentum", t: "动量（趋势跟随）", note: "转债20日动量降序 Top20；附正股20日动量对照（转债动量为排序键；趋势/强周期因子，弱周期仅供观察）"},
+    {k: "iv_rv", t: "隐波差（期权便宜度）", note: "BS隐含波动率−正股60日历史波动率 升序 Top20（最负=期权最便宜；相对价值因子，非周期门控，全周期常显）"},
   ];
   const sTabs = document.getElementById("strat-tabs");
   const sTbl = document.getElementById("strat-tbl");
@@ -358,10 +481,12 @@ const balCell = m => m.bal == null ? "—" :
                   {t: "双低", num: 1}, {t: "纯债溢价%", num: 1}, {t: "YTM%", num: 1}, {t: "余额(亿)", num: 1}];
     if (k === "beta_offense") cols.push({t: "Beta", num: 1});
     if (k === "momentum") cols.push({t: "转债动量%", num: 1}, {t: "正股动量%", num: 1});
+    if (k === "iv_rv") cols.push({t: "隐波差%", num: 1}, {t: "隐含波动率%", num: 1}, {t: "历史波动率%", num: 1});
     const tbl = tblHTML(cols, list.map(m => [`<span class="strong">${m.b}</span>`, m.rt || "—", fmt2(m.p), fmt2(m.cv),
         fmt2(m.pr), fmt2(m.dl), fmt2(m.pb), m.y == null ? "—" : fmt2(m.y), balCell(m),
         ...(k === "beta_offense" ? [fmt2(m.beta)] : []),
-        ...(k === "momentum" ? [fmt2(m.mcb), m.mst == null ? "—" : fmt2(m.mst)] : [])]));
+        ...(k === "momentum" ? [fmt2(m.mcb), m.mst == null ? "—" : fmt2(m.mst)] : []),
+        ...(k === "iv_rv" ? [fmt2(m.ivd), fmt2(m.iv), fmt2(m.hv)] : [])]));
     const offTabs = k === "beta_offense" || k === "momentum";
     const offLbl = k === "beta_offense" ? "进攻榜" : "动量榜";
     sTbl.innerHTML = (offTabs && !rg.strong)
