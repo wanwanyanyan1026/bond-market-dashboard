@@ -189,7 +189,7 @@
 
 </main>
 
-<script src="assets/data/data.js?v=cb-26"></script>
+<script src="assets/data/data.js?v=cb-27"></script>
 <script src="assets/js/echarts.min.js"></script>
 <script>
 /* ============================================================
@@ -469,6 +469,7 @@ const balCell = m => m.bal == null ? "—" :
     {k: "beta_offense", t: "正股高Beta进攻", note: "正股 120 日 beta≥1.1 且平价≥90、价≤150（弱周期自动缺席）"},
     {k: "momentum", t: "动量（趋势跟随）", note: "转债20日动量降序 Top20；附正股20日动量对照（转债动量为排序键；趋势/强周期因子，弱周期仅供观察）"},
     {k: "iv_rv", t: "隐波差（期权便宜度）", note: "BS隐含波动率−正股60日历史波动率 升序 Top20（最负=期权最便宜；相对价值因子，非周期门控，全周期常显）"},
+    {k: "underval", t: "低估（ZL 偏离）", note: "ZL 模型理论价−市场价 / 市场价 降序 Top20（最被低估在前；相对价值因子，周频更新，全周期常显）"},
   ];
   const sTabs = document.getElementById("strat-tabs");
   const sTbl = document.getElementById("strat-tbl");
@@ -482,16 +483,20 @@ const balCell = m => m.bal == null ? "—" :
     if (k === "beta_offense") cols.push({t: "Beta", num: 1});
     if (k === "momentum") cols.push({t: "转债动量%", num: 1}, {t: "正股动量%", num: 1});
     if (k === "iv_rv") cols.push({t: "隐波差%", num: 1}, {t: "隐含波动率%", num: 1}, {t: "历史波动率%", num: 1});
+    if (k === "underval") cols.push({t: "ZL模型价", num: 1}, {t: "偏离%", num: 1});
     const tbl = tblHTML(cols, list.map(m => [`<span class="strong">${m.b}</span>`, m.rt || "—", fmt2(m.p), fmt2(m.cv),
         fmt2(m.pr), fmt2(m.dl), fmt2(m.pb), m.y == null ? "—" : fmt2(m.y), balCell(m),
         ...(k === "beta_offense" ? [fmt2(m.beta)] : []),
         ...(k === "momentum" ? [fmt2(m.mcb), m.mst == null ? "—" : fmt2(m.mst)] : []),
-        ...(k === "iv_rv" ? [fmt2(m.ivd), fmt2(m.iv), fmt2(m.hv)] : [])]));
+        ...(k === "iv_rv" ? [fmt2(m.ivd), fmt2(m.iv), fmt2(m.hv)] : []),
+        ...(k === "underval" ? [fmt2(m.zlm), fmt2(m.zld)] : [])]));
     const offTabs = k === "beta_offense" || k === "momentum";
     const offLbl = k === "beta_offense" ? "进攻榜" : "动量榜";
-    sTbl.innerHTML = (offTabs && !rg.strong)
+    const zlDate = (k === "underval" && strat.zl_date)
+      ? `<div style="margin-bottom:4px;font-size:12px;color:#888">ZL 模型数据日期：${strat.zl_date}（周频更新）</div>` : "";
+    sTbl.innerHTML = zlDate + ((offTabs && !rg.strong)
       ? `<div class="empty">⚠ 弱周期（动量 ${fmt2(rg.momentum)}%）：${offLbl}属趋势/进攻型，规则上建议缺席，下表仅供观察</div>` + tbl
-      : (list.length ? tbl : `<div class="empty">本期无入选券</div>`);
+      : (list.length ? tbl : `<div class="empty">本期无入选券</div>`));
   }
   defs.forEach((d, i) => {
     const b = document.createElement("button");
