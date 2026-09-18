@@ -405,7 +405,7 @@ function renderQuotes(root) {
 
     /* —— 行业景气度矩阵：组分位 0-100，A股惯例红=强 / 绿=弱，点击跳组卡
        （BANDS 8 档色阶已上移至组卡区，与折叠摘要分值 chip 共用） —— */
-    const scored = NAMES.filter((g) => sectors[g] !== "公司观察" && g !== "商品指数")  // 行业矩阵：公司主体/商品总指数非行业，不入阵
+    const scored = NAMES.filter((g) => sectors[g] !== "公司观察" && g !== "商品指数" && g !== "总体景气")  // 行业矩阵：公司主体/商品总指数/总体景气均非行业，不入阵
       .map((g) => ({g, sc: groups[g] && groups[g].score}))
       .sort((a, b) => (b.sc === null || b.sc === undefined ? -1 : b.sc)
         - (a.sc === null || a.sc === undefined ? -1 : a.sc));

@@ -17,6 +17,17 @@
   padding-right: 6px;
 }
 @media (max-width: 1100px) { .grid-2 { grid-template-columns: 1fr; } }
+/* 移动端：侧栏收回顶部（terminal.css 全站无窄屏适配，fixed 245px 侧栏会把手机上的
+   全宽图表挤成 ~36px 不可看）；badge 转常规流、表格容器允许横向滚动 */
+@media (max-width: 860px) {
+  .sidebar { position: static; width: auto; }
+  .main { margin-left: 0; padding: 14px 12px 40px; }
+  .badge { position: static; display: block; margin: 0 0 6px; white-space: normal; }
+  .card-title { padding-right: 0; }
+  .temp-dims { min-width: 0; }
+  .grid > .card { min-width: 0; }   /* grid-2 单列 1fr 隐含 minmax(auto,1fr)，表格 min-content 会把卡片撑出视口 */
+  .card > div[id^="tbl-"] { overflow-x: auto; }
+}
 .risk-note {
   font-size: 12px; color: var(--muted); line-height: 1.6;
   border-top: 1px dashed var(--line); padding-top: 10px; margin-top: 12px;

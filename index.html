@@ -17,7 +17,7 @@
 <main id="panel-root" class="main"></main>
 
 <!-- 依序：数据 → 图表库 → 图表封装 → 导出 → 各面板注册 → 应用路由 -->
-<script src="assets/data/data.js?v=2026-09-17.1702"></script>
+<script src="assets/data/data.js?v=2026-09-18.0823"></script>
 <script src="assets/js/echarts.min.js"></script>
 <script src="assets/js/charts.js"></script>
 <script src="assets/js/vendor/xlsx.min.js"></script>
@@ -195,7 +195,7 @@ PANELS["home"] = {
 };
 </script>
 <script src="assets/js/panels/fundamentals.js"></script>
-<script src="assets/js/panels/industry.js?v=20260917d"></script>
+<script src="assets/js/panels/industry.js?v=20260917e"></script>
 <script src="assets/js/panels/fiscal.js"></script>
 <script src="assets/js/panels/liquidity.js"></script>
 <script src="assets/js/panels/institution.js"></script>
@@ -947,7 +947,10 @@ PANELS["curve"] = {
     a.className = "menu-link"; a.href = "cb.html";
     a.innerHTML = '<i class="menu-ico">🧾</i>可转债模块';
     a.title = "每日复盘（转债×正股）+ 全景&策略雷达";
-    nav.appendChild(a);
+    /* 挂到「生成报告」之前（生成报告保持侧栏最底部） */
+    var rb = Array.prototype.filter.call(nav.querySelectorAll("button.menu-link"),
+                                         function (b) { return b.textContent.indexOf("生成报告") >= 0; })[0];
+    rb ? nav.insertBefore(a, rb) : nav.appendChild(a);
   } else { setTimeout(addCbLink, 120); }
 })();
 </script>
