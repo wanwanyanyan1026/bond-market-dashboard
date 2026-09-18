@@ -14,7 +14,14 @@
   <div class="sidebar-foot" id="sidebar-foot"><!-- 数据更新于 {DATA.meta.asOf} --></div>
 </aside>
 
-<main id="panel-root" class="main"></main>
+<!-- 启动占位：data.js（约 21MB，压缩约 5MB）下载完前页面空白，易被误认为打不开；
+     App.show 渲染前会 root.innerHTML=""，此节点加载完成后自动消失，无需 JS 清理 -->
+<main id="panel-root" class="main">
+  <div id="boot" style="max-width:620px;margin:48px 32px;padding:20px 24px;border:1px solid #26344a;border-radius:8px;color:#8fa3bd;font-size:14px;line-height:2">
+    <b style="color:#c8d6e5">正在加载数据包…</b><br>
+    数据包约 21MB（压缩后约 5MB），境内访问 Cloudflare 国际线路较慢，<b>首次加载可能需要 30–60 秒</b>，请保持页面打开；加载完成后自动进入看板，二次访问有本地缓存会明显变快。
+  </div>
+</main>
 
 <!-- 依序：数据 → 图表库 → 图表封装 → 导出 → 各面板注册 → 应用路由 -->
 <script src="assets/data/data.js?v=2026-09-18.2338"></script>
@@ -984,6 +991,22 @@ PANELS["curve"] = {
     var q = nav.querySelector('[data-panel="quant"]');
     q ? q.insertAdjacentElement("afterend", a) : nav.appendChild(a);  // 找不到面板按钮时退回尾部
   } else { setTimeout(addThermoLink, 120); }
+})();
+</script>
+
+<script>
+/* 宏观观察入口（macro3.html 独立子页：财政/流动性/货币信用 三张 PPT 版式宏观页，月度） */
+(function addMacro3Link() {
+  var nav = document.getElementById("nav");
+  if (nav && nav.children.length) {
+    var a = document.createElement("a");
+    a.className = "menu-link"; a.href = "macro3.html";
+    a.innerHTML = '<i class="menu-ico">🌍</i>宏观观察';
+    a.title = "宏观三页：财政融资端 / 流动性综合 / 货币信用四象限（月度）";
+    /* 挂到「可转债模块」外链之前（生成报告保持侧栏最底部） */
+    var cb = nav.querySelector('a.menu-link[href="cb.html"]');
+    cb ? nav.insertBefore(a, cb) : nav.appendChild(a);
+  } else { setTimeout(addMacro3Link, 120); }
 })();
 </script>
 
