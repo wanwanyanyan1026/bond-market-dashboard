@@ -349,14 +349,13 @@ PANELS["institution"] = {
     const PCT_INST_ORDER = ["基金公司", "证券公司", "理财", "大型银行", "中小型银行", "保险公司", "其他"];
     const PCT_MAT_ORDER = {地方政府债: ["≤1y", "1-3y", "3-5y", "5-7y", "7-10y", "10-15y", "15-20y", "20-30y"]};
     const PCT_MAT_LABEL = {__all__: "全部期限（板块合计）"};
-    const PCT_FREQ_WIN_KEYS = {daily: ["60d", "1y"], weekly: ["1y", "3y"], monthly: ["1y", "3y"]};
-    const PCT_WIN_SHORT = {daily: {"60d": "60日", "1y": "1年"}, weekly: {"1y": "1年", "3y": "3年"},
-                           monthly: {"1y": "1年", "3y": "3年"}};
-    const pctBlocksT = Object.keys(((PCT_TREND.daily || {}).blocks) || {});
-    const pctState = {freq: "daily", win: "60d", block: pctBlocksT[0], mat: "__all__", sel: {}};
+    const PCT_FREQ_WIN_KEYS = {weekly: ["1y", "3y"], monthly: ["1y", "3y"]};   // 趋势卡只出周/月（日度太密，2026-09 用户）
+    const PCT_WIN_SHORT = {weekly: {"1y": "1年", "3y": "3年"}, monthly: {"1y": "1年", "3y": "3年"}};
+    const pctBlocksT = Object.keys(((PCT_TREND.weekly || {}).blocks) || {});
+    const pctState = {freq: "weekly", win: "1y", block: pctBlocksT[0], mat: "__all__", sel: {}};
     const PCT_DEFAULT_SEL = ["基金公司", "证券公司", "大型银行", "保险公司"];
     const pctFreqTabs = h("div", {class: "tabs", id: "inst-pct-freq"},
-      [["daily", "日度"], ["weekly", "周度"], ["monthly", "月度"]].map(([f, lab], i) =>
+      [["weekly", "周度"], ["monthly", "月度"]].map(([f, lab], i) =>
         h("button", {class: "tab" + (i === 0 ? " active" : ""), "data-f": f,
           onclick: () => { pctState.freq = f; pctState.win = PCT_FREQ_WIN_KEYS[f][0]; renderPctCtrls(); resetPctSel(); drawPctTrend(); }},
           [lab])));
@@ -581,7 +580,7 @@ PANELS["institution"] = {
         h("div", {class: "empty"}, ["申赎情绪数据待接入（shenShu 空）"])] :
       [h("h3", {class: "card-title"}, ["公募申赎情绪"]),
        App.badge("开源固收 · 申赎情绪跟踪", fetchedAt),
-       h("p", {class: "card-sub"}, ["情绪值 = 当日净申赎 = 申购强度 − 赎回强度，无量纲强度差（非金额，正=净申购/红、负=净赎回/蓝）；3年分位 = 当期值在近 3 年样本中的百分位（本周 = 本周至今周合计 vs 近 3 年完整周）；累计 = 自 2020 基期起累计净申赎强度（非今年以来）· 表为最新一期快照，线为近 180 日 · 图例点选类型（默认 纯债/固收+/货基）"]),
+       h("p", {class: "card-sub"}, ["情绪值 = 当日净申赎 = 申购强度 − 赎回强度，无量纲强度差（非金额，正=净申购/红、负=净赎回/蓝）；3年分位 = 当期值在近 3 年样本中的百分位（本周 = 本周至今周合计 vs 近 3 年完整周）；累计 = 今年以来累计当日净申赎（年初至今求和）· 表为最新一期快照，线为近 180 日 · 图例点选类型（默认 纯债/固收+/货基）"]),
        ssTable, ssBox,
        SS.paragraph ? h("p", {class: "card-sub", style: {marginTop: "8px"}}, [SS.paragraph]) : null]);
     let ssChart = null;

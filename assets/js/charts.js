@@ -41,7 +41,7 @@ const C_BLUE = "#1769aa", C_BLUE_DK = "#0b4f87", C_RED = "#c24135",
       C_TEXT = "#425466", C_STRONG = "#0a2540", C_MUTED = "#587086",
       C_LINE = "#d8e2eb", C_LINE_SOFT = "#e8eef4";
 /* 多序列调色板：ColorBrewer Dark2 为主的可区分 14 色（首色保留站内蓝——单线图
-   视觉不变）；seasonal 灰阶+当年高亮、热力红蓝、正负柱语义色不受影响 */
+   视觉不变）；seasonal 历史年多色（跳过首色）+当年蓝加粗、热力红蓝、正负柱语义色 */
 const SERIES_COLORS = ["#1769aa", "#d95f02", "#1b9e77", "#7570b3", "#e7298a", "#66a61e",
       "#e6ab02", "#a6761d", "#66c2a5", "#fc8d62", "#8da0cb", "#b3b3b3", "#e41a1c", "#6a3d9a"];
 
@@ -145,10 +145,7 @@ const Charts = {
     ys.sort((a, b) => Number(a) - Number(b));
     const cur = ys[ys.length - 1];                       // 当年 = 最大年
     const hist = ys.slice(0, -1);
-    const gray = (i) => {                                // 历史年灰阶：越近越深
-      const t = hist.length <= 1 ? 0 : i / (hist.length - 1);
-      return "rgb(" + [178, 187, 197].map((x, k) => Math.round(x + ([112, 130, 145][k] - x) * t)).join(",") + ")";
-    };
+    const hc = (i) => SERIES_COLORS[1 + i % (SERIES_COLORS.length - 1)]; // 历史年逐色：跳过首色（当年蓝）
     const n = Math.max(...ys.map(y => map[y].length));
     const labels = (xLabels && xLabels.length) ? xLabels : Array.from({length: n}, (_, i) => i + 1);
     return _mount(el, Object.assign(_base(), {
@@ -158,9 +155,9 @@ const Charts = {
       yAxis: _axisY(yUnit),
       series: (() => {
         const series = ys.map(y => {
-          const isCur = y === cur, g = gray(hist.indexOf(y));
+          const isCur = y === cur, c = isCur ? C_BLUE : hc(hist.indexOf(y)); // 各年异色，当年=站内蓝加粗
           return {name: y, type: "line", showSymbol: false, connectNulls: true,
-            itemStyle: {color: isCur ? C_BLUE : g}, lineStyle: {width: isCur ? 2.5 : 1.1, color: isCur ? C_BLUE : g},
+            itemStyle: {color: c}, lineStyle: {width: isCur ? 2.5 : 1.2, color: c},
             emphasis: {focus: "series"}, data: map[y].map(x => x === undefined ? null : x)};
         });
         if (endpoint) {                                  // 累计图：当年线端点带年份标签（参考定期跟踪看板）
