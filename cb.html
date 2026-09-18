@@ -200,7 +200,7 @@
 
 </main>
 
-<script src="assets/data/data.js?v=cb-27"></script>
+<script src="assets/data/data.js?v=cb-28"></script>
 <script src="assets/js/echarts.min.js"></script>
 <script>
 /* ============================================================
@@ -250,6 +250,8 @@ function tblHTML(cols, rows) {
 }
 const balCell = m => m.bal == null ? "—" :
   `<span class="${m.bal < 3 ? "small-bal" : ""}" ${m.bal < 3 ? 'title="剩余规模<3亿：流动性偏弱/易受强赎冲击"' : ""}>${m.bal < 3 ? "⚠ " : ""}${fmt2(m.bal)}</span>`;
+const remCell = m => m.rem == null ? "—" :
+  `<span class="${m.rem < 0.5 ? "small-bal" : ""}" ${m.rem < 0.5 ? 'title="剩余期限<0.5年：临近到期兑付，价格向到期价值收敛"' : ""}>${m.rem < 0.5 ? "⚠ " : ""}${fmt2(m.rem)}</span>`;
 
 /* ============================================================ Tab1 复盘 */
 (function renderReview() {
@@ -485,18 +487,19 @@ const balCell = m => m.bal == null ? "—" :
   const sTabs = document.getElementById("strat-tabs");
   const sTbl = document.getElementById("strat-tbl");
   document.getElementById("strat-note").textContent =
-    `当前 ${rg.strong ? "强" : "弱"}周期 → 主榜 ${rg.strong ? "低溢价 / 高Beta" : "双低 / 低价"}；已公告赎回/回售中的券自动剔除（黑名单）；余额<3亿 标 ⚠（流动性偏弱/易受强赎冲击）`;
+    `当前 ${rg.strong ? "强" : "弱"}周期 → 主榜 ${rg.strong ? "低溢价 / 高Beta" : "双低 / 低价"}；已公告赎回/回售中的券自动剔除（黑名单）；余额<3亿 标 ⚠（流动性偏弱/易受强赎冲击）；剩余期限<0.5年 标 ⚠（临近到期兑付）`;
   document.getElementById("strat-badge").textContent = "skill 策略雷达规则 · 财汇本地";
   function showStrat(k) {
     const list = strat[k] || [];
     const cols = [{t: "转债"}, {t: "评级"}, {t: "价格", num: 1}, {t: "平价", num: 1}, {t: "溢价%", num: 1},
-                  {t: "双低", num: 1}, {t: "纯债溢价%", num: 1}, {t: "YTM%", num: 1}, {t: "余额(亿)", num: 1}];
+                  {t: "双低", num: 1}, {t: "纯债溢价%", num: 1}, {t: "YTM%", num: 1}, {t: "余额(亿)", num: 1},
+                  {t: "剩余期限(年)", num: 1}];
     if (k === "beta_offense") cols.push({t: "Beta", num: 1});
     if (k === "momentum") cols.push({t: "转债动量%", num: 1}, {t: "正股动量%", num: 1});
     if (k === "iv_rv") cols.push({t: "隐波差%", num: 1}, {t: "隐含波动率%", num: 1}, {t: "历史波动率%", num: 1});
     if (k === "underval") cols.push({t: "ZL模型价", num: 1}, {t: "偏离%", num: 1});
     const tbl = tblHTML(cols, list.map(m => [`<span class="strong">${m.b}</span>`, m.rt || "—", fmt2(m.p), fmt2(m.cv),
-        fmt2(m.pr), fmt2(m.dl), fmt2(m.pb), m.y == null ? "—" : fmt2(m.y), balCell(m),
+        fmt2(m.pr), fmt2(m.dl), fmt2(m.pb), m.y == null ? "—" : fmt2(m.y), balCell(m), remCell(m),
         ...(k === "beta_offense" ? [fmt2(m.beta)] : []),
         ...(k === "momentum" ? [fmt2(m.mcb), m.mst == null ? "—" : fmt2(m.mst)] : []),
         ...(k === "iv_rv" ? [fmt2(m.ivd), fmt2(m.iv), fmt2(m.hv)] : []),
