@@ -554,6 +554,37 @@ PANELS["institution"] = {
     const ssTd = (txt, o = {}) => h("td", {style: {padding: "4px 10px", fontSize: "12px",
       textAlign: o.align || "right", whiteSpace: "nowrap",
       color: o.color || "var(--strong)", fontWeight: o.bold ? 600 : 400}}, [txt]);
+    const ssDates = [...new Set(ssTypes.flatMap((t) => (t.last5 || []).map((x) => x && x.d)))]
+      .filter(Boolean).sort().reverse();          // 近5交易日（新→旧），默认最新
+    let ssDate = ssDates[0] || null;              // null = 无 last5，回退旧版静态行
+    const ssDateSel = h("select", {id: "inst-shenshu-date",
+      style: {fontSize: "12px", padding: "2px 6px", border: "1px solid #dfe5ec",
+        borderRadius: "4px", background: "transparent", color: "var(--strong)"}},
+      ssDates.map((d) => h("option", {value: d}, [d])));
+    const ssBody = h("tbody", {});
+    function renderSsRows() {                     // 当日净申赎+日分位两列随所选交易日切换
+      ssBody.innerHTML = "";
+      ssTypes.forEach((t) => {
+        const p = ssDate ? (t.last5 || []).find((x) => x.d === ssDate) : null;
+        const v = ssDate ? (p ? p.v : null) : t.latest;
+        const pc = ssDate ? (p ? p.pct3y : null) : t.pct3y;
+        ssBody.append(h("tr", {}, [
+          ssTd(t.name, {align: "left", bold: true}),
+          ssTd(v == null ? "—" : (v >= 0 ? "+" : "") + App.fmt(v, 2),
+            {color: v == null ? "var(--muted)" : (v >= 0 ? "rgb(194,65,53)" : "rgb(23,105,170)")}),
+          ssTd(pc == null ? "—" : pc + "%"),
+          ssTd((t.week == null ? "—" : (t.week >= 0 ? "+" : "") + App.fmt(t.week, 1)),
+            {color: t.week == null ? "var(--muted)" : (t.week >= 0 ? "rgb(194,65,53)" : "rgb(23,105,170)")}),
+          ssTd(t.weekPct3y == null ? "—" : t.weekPct3y + "%"),
+          ssTd(App.fmt(t.avg20, 2)),
+          ssTd(App.fmt(t.cum, 1)),
+        ]));
+      });
+    }
+    if (ssDates.length) ssDateSel.addEventListener("change", () => {
+      ssDate = ssDateSel.value; renderSsRows();
+    });
+    renderSsRows();
     const ssTable = h("table", {id: "inst-shenshu-table",
       style: {borderCollapse: "collapse", margin: "4px 0 10px", width: "100%"}}, [
       h("thead", {}, [h("tr", {}, [["类型", "left"], ["当日净申赎", "right"], ["3年分位", "right"],
@@ -561,17 +592,7 @@ PANELS["institution"] = {
         .map(([t, a]) =>
         h("th", {style: {padding: "4px 10px", fontSize: "11px", color: "var(--muted)", fontWeight: 600,
           textAlign: a, whiteSpace: "nowrap", borderBottom: "1px solid #dfe5ec"}}, [t])))]),
-      h("tbody", {}, ssTypes.map((t) => h("tr", {}, [
-        ssTd(t.name, {align: "left", bold: true}),
-        ssTd((t.latest >= 0 ? "+" : "") + App.fmt(t.latest, 2),
-          {color: t.latest >= 0 ? "rgb(194,65,53)" : "rgb(23,105,170)"}),
-        ssTd(t.pct3y == null ? "—" : t.pct3y + "%"),
-        ssTd((t.week == null ? "—" : (t.week >= 0 ? "+" : "") + App.fmt(t.week, 1)),
-          {color: t.week == null ? "var(--muted)" : (t.week >= 0 ? "rgb(194,65,53)" : "rgb(23,105,170)")}),
-        ssTd(t.weekPct3y == null ? "—" : t.weekPct3y + "%"),
-        ssTd(App.fmt(t.avg20, 2)),
-        ssTd(App.fmt(t.cum, 1)),
-      ]))),
+      ssBody,
     ]);
     const ssSeries = ssTypes.map((t) => ({name: t.name, dates: t.dates, values: t.values}));
     const ssBox = h("div", {id: "inst-shenshu-chart", class: "chart"});
@@ -580,7 +601,10 @@ PANELS["institution"] = {
         h("div", {class: "empty"}, ["申赎情绪数据待接入（shenShu 空）"])] :
       [h("h3", {class: "card-title"}, ["公募申赎情绪"]),
        App.badge("开源固收 · 申赎情绪跟踪", fetchedAt),
-       h("p", {class: "card-sub"}, ["情绪值 = 当日净申赎 = 申购强度 − 赎回强度，无量纲强度差（非金额，正=净申购/红、负=净赎回/蓝）；3年分位 = 当期值在近 3 年样本中的百分位（本周 = 本周至今周合计 vs 近 3 年完整周）；累计 = 今年以来累计当日净申赎（年初至今求和）· 表为最新一期快照，线为近 180 日 · 图例点选类型（默认 纯债/固收+/货基）"]),
+       h("p", {class: "card-sub"}, ["情绪值 = 当日净申赎 = 申购强度 − 赎回强度，无量纲强度差（非金额，正=净申购/红、负=净赎回/蓝）；3年分位 = 当期值在近 3 年样本中的百分位（本周 = 本周至今周合计 vs 近 3 年完整周）；累计 = 今年以来累计当日净申赎（年初至今求和）· 表快照按交易日下拉切换（默认最新），线为近 180 日 · 图例点选类型（默认 纯债/固收+/货基）"]),
+       ssDates.length ? h("div", {style: {margin: "2px 0 4px"}}, [
+         h("span", {style: {fontSize: "12px", color: "var(--muted)", marginRight: "6px"}}, ["交易日"]),
+         ssDateSel]) : null,
        ssTable, ssBox,
        SS.paragraph ? h("p", {class: "card-sub", style: {marginTop: "8px"}}, [SS.paragraph]) : null]);
     let ssChart = null;
@@ -655,6 +679,40 @@ PANELS["institution"] = {
     }
     tabLdW.addEventListener("click", () => drawLd("周频"));
     tabLdD.addEventListener("click", () => drawLd("日频"));
+
+    /* —— ⑦b 10Y/30Y 国债换手率：热力图底稿 10DMA 日度（%），近250日 —— */
+    const TO = I.turnover || {};
+    const toOk = Array.isArray(TO.dates) && TO.dates.length;
+    const toSeries = toOk
+      ? ["10Y", "30Y"].filter((n) => TO.series && has(TO.series[n] && TO.series[n].values))
+          .map((n) => ({name: "国债" + n + " 换手率", dates: TO.dates, values: TO.series[n].values}))
+      : [];
+    const toAB = (D.home && D.home.activeBonds) || {};  // home 在 data.js 核心段，恒可读
+    const toAbTxt = (n) => { const t = toAB[n] || [];
+      return t.length ? n + "：" + t.map((x) => x.code).join("/") : null; };
+    const toAbBits = [toAbTxt("10Y"), toAbTxt("30Y")].filter(Boolean);
+    const toBox = h("div", {id: "inst-turnover-chart", class: "chart"});
+    const turnoverCard = h("section", {class: "card", id: "inst-turnover-card"},
+      !toOk ? [h("h3", {class: "card-title"}, ["10Y/30Y 国债换手率"]),
+        h("div", {class: "empty"}, ["换手率数据待接入（turnover 空）"])] :
+      [h("h3", {class: "card-title"}, ["10Y/30Y 国债换手率"]),
+       App.badge("换手率热力图底稿 · 10DMA", fetchedAt),
+       h("p", {class: "card-sub"}, ["10日均线口径（%），2019 年以来全历史 · 分位基期：10Y 自 2019 年、30Y 自 2023 年（30Y 自 2023 年成交方兴，此前样本不可比）"
+         + (toAbBits.length ? " · 当期活跃券 " + toAbBits.join("，") : "")]),
+       h("div", {style: {display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "8px"}},
+         ["10Y", "30Y"].filter((n) => TO.series && TO.series[n] && TO.series[n].latest != null)
+           .map((n) => h("span", {style: {fontSize: "12px", padding: "2px 10px",
+             borderRadius: "12px", color: "#5a6673", background: "rgba(138,148,159,.12)",
+             border: "1px solid currentColor"}},
+             [n + " " + App.fmt(TO.series[n].latest, 2) + "%"
+              + (TO.series[n].pct == null ? ""
+                 : "（" + (TO.series[n].base || "全历史") + " " + TO.series[n].pct + "%分位）")]))),
+       toBox,
+       TO.paragraph ? h("p", {class: "card-sub", style: {marginTop: "8px"}}, [TO.paragraph]) : null]);
+    function drawTurnover() {
+      toBox.innerHTML = "";
+      Charts.line(toBox, {series: toSeries, yUnit: "%", range: "ALL"});
+    }
 
     /* —— ⑧ 理财规模：总量（万亿）与分类型（亿元）量纲不同 → 两图并排 —— */
     const we = I.wealth || {};
@@ -784,6 +842,7 @@ PANELS["institution"] = {
     function drawProduct() {                      // Tab2 激活时统一绘制（echarts.init 需非零宽高）
       if (ssTypes.length) drawShenShu();
       if (ldOk) { drawLd(ldMode); drawLdRatio(); }
+      if (toSeries.length) drawTurnover();
       if (weOk && has(we.total)) Charts.line(wealthTotalBox,
         {series: [{name: "理财规模总量", dates: we.dates, values: we.total}], yUnit: "万亿元", range: "ALL"});
       if (byTypeSeries.length) Charts.line(wealthByBox, {series: byTypeSeries, yUnit: "亿元", range: "ALL",
@@ -800,7 +859,7 @@ PANELS["institution"] = {
     root.append(Export.btn("institution"));
     root.append(h("div", {class: "tabs", style: {marginBottom: "4px"}}, [pTabA, pTabB]));
     wrapNetbuy.append(twoWeekCard, heatCard, netbuyCard, pctCard, seasonCard);
-    wrapProduct.append(shenshuCard, lendingCard, wealthCard, wealthMcpCard,
+    wrapProduct.append(shenshuCard, lendingCard, turnoverCard, wealthCard, wealthMcpCard,
       h("div", {class: "grid grid-2"}, [durationCard, leverageCard]));
     root.append(wrapNetbuy, wrapProduct);
 

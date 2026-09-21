@@ -35,17 +35,70 @@ function h(tag, attrs, children) {
 const App = {
   current: null,  // 防 hash 写入回环触发重复渲染
 
-  show(id) {
+  /* 大模块按需加载（方案A，2026-09-20）：面板 → 依赖的数据段。data.js 只含
+     核心段 + meta.vers 版本表（内容哈希），进入面板时才 fetch m_<sec>.json；
+     未变模块 URL 不变，浏览器 immutable 缓存直接命中。 */
+  SECS: {
+    home: ["institution", "liquidity"],
+    institution: ["institution"],
+    liquidity: ["liquidity"],
+    industry: ["industry"],
+    spread: ["spread"],
+  },
+  _secPromises: {},
+
+  ensure(secs) {
+    const vers = (typeof DATA !== "undefined" && DATA.meta && DATA.meta.vers) || {};
+    secs.forEach(sec => {
+      if (DATA[sec] !== undefined || this._secPromises[sec]) return;
+      const v = vers[sec] || "";
+      this._secPromises[sec] = fetch(`assets/data/m_${sec}.json${v ? "?v=" + v : ""}`)
+        .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+        .then(j => { DATA[sec] = j; })
+        .catch(e => { delete this._secPromises[sec]; throw e; });  // 失败清缓存，下次可重试
+    });
+    return Promise.all(secs.map(sec => this._secPromises[sec]).filter(Boolean));
+  },
+
+  async show(id) {
     if (!PANELS[id]) id = "home";                      // 面板不存在回退 home
     if (id === this.current) return;
+    const prev = this.current;
     this.current = id;
     if (location.hash !== "#" + id) location.hash = id; // 触发 hashchange（此处已置 current，回环为 no-op）
     document.querySelectorAll(".menu-link").forEach(a => a.classList.toggle("active", a.dataset.panel === id));
     const root = document.getElementById("panel-root");
     root.innerHTML = "";
     window.scrollTo(0, 0);
+    // dev 自检页加载 app.js 但无 data.js：DATA 未定义时跳过按需加载直接渲染
+    const secs = (typeof DATA !== "undefined") ? (this.SECS[id] || []) : [];
+    if (!secs.length || secs.every(sec => DATA[sec] !== undefined)) {
+      PANELS[id].render(root);
+      this.asOf(id);   // 右上角随面板显示该模块数据截止日
+      return;
+    }
+    const hint = (border, ink, title, msg) => h("div", {style: {maxWidth: "620px",
+      margin: "48px 32px", padding: "20px 24px", border: "1px solid " + border,
+      borderRadius: "8px", color: border, fontSize: "14px", lineHeight: "2"}}, [
+      h("b", {style: {color: ink}}, [title]), h("br"), msg,
+    ]);
+    root.append(hint("#26344a", "#c8d6e5", "正在加载模块数据…",
+      "利差 / 行业 / 流动性 / 机构 / 品种等大模块按需下载，首次进入约需数秒到数十秒；二次访问走本地缓存。"));
+    try {
+      await this.ensure(secs);
+    } catch (e) {
+      this.current = prev;   // 回退 current，允许用户重进同一面板重试
+      root.innerHTML = "";
+      root.append(hint("#c77d0a", "#c77d0a", "模块数据加载失败",
+        location.protocol === "file:"
+          ? "当前以本地文件（file://）方式打开，浏览器禁止按需加载模块数据；请改用线上地址或本地预览服务器（HTTP）访问。"
+          : "请检查网络后刷新页面重试（已加载的其他面板不受影响）。"));
+      return;
+    }
+    if (this.current !== id) return;   // 等待期间用户已切走，交给新的 show
+    root.innerHTML = "";
     PANELS[id].render(root);
-    this.asOf(id);   // 右上角随面板显示该模块数据截止日
+    this.asOf(id);
   },
 
   /* 右上角数据日期：当前面板模块 asOf，无（如 home 聚合页/JSON 模块）回退全局 */

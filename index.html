@@ -14,17 +14,18 @@
   <div class="sidebar-foot" id="sidebar-foot"><!-- 数据更新于 {DATA.meta.asOf} --></div>
 </aside>
 
-<!-- 启动占位：data.js（约 21MB，压缩约 5MB）下载完前页面空白，易被误认为打不开；
-     App.show 渲染前会 root.innerHTML=""，此节点加载完成后自动消失，无需 JS 清理 -->
+<!-- 启动占位：核心 data.js（约 1.5MB；利差/行业/流动性/机构/品种五大模块已拆分按需加载）
+     下载完前页面空白，易被误认为打不开；App.show 渲染前会 root.innerHTML=""，
+     此节点加载完成后自动消失，无需 JS 清理 -->
 <main id="panel-root" class="main">
   <div id="boot" style="max-width:620px;margin:48px 32px;padding:20px 24px;border:1px solid #26344a;border-radius:8px;color:#8fa3bd;font-size:14px;line-height:2">
     <b style="color:#c8d6e5">正在加载数据包…</b><br>
-    数据包约 21MB（压缩后约 5MB），境内访问 Cloudflare 国际线路较慢，<b>首次加载可能需要 30–60 秒</b>，请保持页面打开；加载完成后自动进入看板，二次访问有本地缓存会明显变快。
+    核心数据约 1.5MB；利差 / 行业 / 流动性 / 机构 / 品种等大模块进入对应面板时再按需加载（首次约数秒到数十秒）；加载完成后自动进入看板，二次访问有本地缓存会明显变快。
   </div>
 </main>
 
 <!-- 依序：数据 → 图表库 → 图表封装 → 导出 → 各面板注册 → 应用路由 -->
-<script src="assets/data/data.js?v=2026-09-20.1858"></script>
+<script src="assets/data/data.js?v=2026-09-21.0858"></script>
 <script src="assets/js/echarts.min.js"></script>
 <script src="assets/js/charts.js"></script>
 <script src="assets/js/vendor/xlsx.min.js"></script>
@@ -68,6 +69,14 @@ PANELS["home"] = {
     // 收益率行 as-of：优先锚点源（日频）自身末日 yieldsAsOf；全局 meta.asOf 混入
     // 周度 W-SUN 标签（未来周日）时不得跟着显示未来日期
     const asOf = (D.home && D.home.yieldsAsOf) || (D.meta && D.meta.asOf) || "";
+    const AB = (D.home && D.home.activeBonds) || {};   // J 活跃券：财汇要素表最新上市2只
+    const abLine = (key) => {
+      const t = key === "国债10Y" ? AB["10Y"] : key === "国债30Y" ? AB["30Y"] : null;
+      if (!Array.isArray(t) || !t.length) return null;
+      return h("div", {style: {fontSize: "11px", color: "var(--muted)", marginTop: "2px",
+        whiteSpace: "nowrap"}},
+        ["活跃 " + t[0].code + (t.length > 1 ? " · 次新 " + t[1].code : "")]);
+    };
     const anchorsCard = h("section", {class: "card"}, [
       anchors.length
         ? [asOf ? h("div", {style: {fontSize: "12px", color: "var(--muted)", marginBottom: "6px"}},
@@ -76,6 +85,7 @@ PANELS["home"] = {
             h("div", {class: "anchor-label"}, [(a && a.key) || "—"]),
             h("div", {class: "anchor-value"}, [App.fmt(a && a.value, 2)]),
             h("div", {class: "anchor-chg"}, [chgSpan(a && a.wowBp)]),
+            (a && (a.key === "国债10Y" || a.key === "国债30Y")) ? abLine(a.key) : null,
             (a && a.seriesKey)
               ? h("div", {style: {fontSize: "11px", color: "var(--muted)", marginTop: "2px"}},
                   ["口径 " + a.seriesKey + (_HOME_FIXING_KEYS.has(a.seriesKey) ? "（定盘）" : "")])

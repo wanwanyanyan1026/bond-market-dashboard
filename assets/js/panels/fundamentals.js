@@ -112,14 +112,15 @@ PANELS["fundamentals"] = {
     const dpOf = (r) => r.unit === "元" ? 4 : 1;
     const fmtChg = (v, dp = 1) => (v === null || v === undefined || v === "" || Number.isNaN(Number(v)))
       ? null : (v > 0 ? "+" : "") + App.fmt(v, dp);
-    function buildTable(container, rows, withSpark) {
+    function buildTable(container, rows, withSpark, dp) {
+      const rdp = (r) => dp === undefined ? dpOf(r) : dp;   // 海外表传 2：关键指标统一两位小数
       const columns = [
         {key: "name", label: "指标"}, {key: "latest", label: "最新值", num: true},
         {key: "prev", label: "前值", num: true}, {key: "chg", label: "变动"},
       ];
       if (withSpark) columns.push({key: "spark", label: "走势"});
-      const view = rows.map(r => ({name: r.name || r.key || "—", latest: App.fmt(r.latest, dpOf(r)),
-        prev: App.fmt(r.prev, dpOf(r)), chg: fmtChg(r.chg, dpOf(r)), spark: ""}));
+      const view = rows.map(r => ({name: r.name || r.key || "—", latest: App.fmt(r.latest, rdp(r)),
+        prev: App.fmt(r.prev, rdp(r)), chg: fmtChg(r.chg, rdp(r)), spark: ""}));
       const trs = Charts.table(container, {columns, rows: view,
         onRowClick: (row, i) => { if ((rows[i].dates || []).length >= 2) openModal(rows[i]); }});
       trs.forEach((tr, i) => {
@@ -131,7 +132,7 @@ PANELS["fundamentals"] = {
         cd.textContent = "";
         cd.append(has
           ? h("span", {class: v > 0 ? "up" : v < 0 ? "down" : "flat"},
-              [v > 0 ? "▲ +" : v < 0 ? "▼ " : "", App.fmt(v, dpOf(r))])
+              [v > 0 ? "▲ +" : v < 0 ? "▼ " : "", App.fmt(v, rdp(r))])
           : h("span", {class: "flat"}, ["—"]));
         if (withSpark) {                                               // 走势列：sparkline 挂进 td（近 36 期）
           const sd = tr.cells[4];
@@ -152,13 +153,27 @@ PANELS["fundamentals"] = {
       macroBox,
     ]);
     const trimEnd = (s) => s.replace(/^[\s·]+|[\s·]+$/g, "");
+    /* —— 只展示最新一周：以最新事件所在周的周一为界（日期为 ISO 零填充，可字典序比较）；
+       历史事件全量在 manual_inputs/events.json —— */
+    const evSorted = events.slice().sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+    const weekEvents = (() => {
+      if (!evSorted.length) return [];
+      const d = new Date(String(evSorted[0].date).slice(0, 10) + "T00:00:00");
+      if (isNaN(d)) return evSorted;
+      d.setDate(d.getDate() - (d.getDay() + 6) % 7);   // 周一 = 0
+      const p2 = (n) => String(n).padStart(2, "0");
+      const mon = d.getFullYear() + "-" + p2(d.getMonth() + 1) + "-" + p2(d.getDate());
+      return evSorted.filter(ev => String(ev.date || "") >= mon);
+    })();
     const eventsCard = h("section", {class: "card", id: "events-card"}, [
       h("h3", {class: "card-title"}, ["本周数据及政策梳理"]),
       App.badge("manual_inputs/events.json"),
-      events.length
+      h("p", {class: "card-sub"},
+        ["仅展示最新一周（周一至今）事件，共 " + weekEvents.length + " 条 · 历史事件见 manual_inputs/events.json"]),
+      weekEvents.length
         ? h("div", {class: "timeline", style: {marginLeft: "4px", marginTop: "6px",
             borderLeft: "2px solid var(--line-soft)", paddingLeft: "20px"}},
-            events.map(ev => h("div", {style: {position: "relative", paddingBottom: "16px"}}, [
+            weekEvents.map(ev => h("div", {style: {position: "relative", paddingBottom: "16px"}}, [
               h("span", {style: {position: "absolute", left: "-25.5px", top: "3px", width: "9px",
                 height: "9px", borderRadius: "50%", background: "var(--blue)",
                 boxShadow: "0 0 0 3px var(--surface)"}}, []),
@@ -201,7 +216,7 @@ PANELS["fundamentals"] = {
     root.append(Export.btn("fundamentals"));
     root.append(macroCard, eventsCard, policyCard, h("div", {class: "grid grid-2"}, [ovCard, usyCard]), modal);
     buildTable(macroBox, macroRows, true);
-    buildTable(ovBox, ovRows, true);
+    buildTable(ovBox, ovRows, true, 2);
     if (polRows.length) Charts.table(polBox, {
       columns: polCols.map((c, i) => ({key: "k" + i, label: c})),
       rows: polRows.map((r) => Object.fromEntries(polCols.map((_, i) => ["k" + i, r[i]]))),
