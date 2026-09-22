@@ -22,6 +22,7 @@
    */
 
 let _subView = "prosp";   // 子分页当前视图（会话级保留；默认先看景气度×行业利差）
+let _fullMap = null, _fullLoading = false;   // 全史懒载缓存（m_industry_full.json，modal 全史按钮触发，跨渲染复用）
 
 PANELS["industry"] = {
   title: "行业高频",
@@ -60,18 +61,48 @@ function renderQuotes(root) {
     /* —— modal（App.modal 骨架）：全历史折线 ↔ 季节性 —— */
     const MONTHS = ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
     const SEASON_YEARS = 10;                               // 季节性最多画近 10 年
-    let cur = null, mode = "line", titleEl = null, chartBox = null;
+    let cur = null, cur10y = null, curKey = null, curFull = null, mode = "line", titleEl = null, chartBox = null;
     const seasonBtn = h("button", {id: "ind-season-btn", class: "tab"}, ["季节性对比"]);
+    const fullBtn = h("button", {id: "ind-full-btn", class: "tab", title: "近10年 vs 全历史（1989 起）切换"}, ["加载全史"]);
     const seasonNote = h("span", {style: {fontSize: "12px", color: "var(--muted)"}}, []);
     const srcTag = h("span", {style: {fontSize: "11px", color: "var(--muted)", whiteSpace: "nowrap"}}, []);
     const modal = App.modal("", (t, b) => {
       titleEl = t; titleEl.id = "ind-modal-title";
       chartBox = b;
       return h("div", {style: {display: "flex", alignItems: "center", gap: "10px", margin: "12px 0 2px"}},
-        [seasonBtn, seasonNote, h("span", {style: {flex: "1"}}), srcTag]);
+        [seasonBtn, fullBtn, seasonNote, h("span", {style: {flex: "1"}}), srcTag]);
     });
     modal.id = "industry-modal";
     seasonBtn.addEventListener("click", () => draw(mode === "line" ? "seasonal" : "line"));
+    /* 全史懒载（方案D）：默认 m_industry.json 仅近10年；点全史按钮拉 m_industry_full.json
+       换该品种 dates/values 重绘（line/seasonal 同享 cur）。_fullMap 跨渲染复用，一次拉全用。 */
+    function syncFullBtn() {
+      if (_fullLoading) { fullBtn.textContent = "加载中…"; fullBtn.disabled = true; fullBtn.style.opacity = "0.6"; return; }
+      fullBtn.disabled = false; fullBtn.style.opacity = "";
+      fullBtn.textContent = (cur === curFull && curFull) ? "返回近10年" : "加载全史";
+    }
+    async function ensureFull() {
+      if (_fullMap) return;
+      _fullLoading = true; syncFullBtn();
+      try {
+        await App.ensure(["industry_full"]);
+        const F = (typeof DATA !== "undefined" && DATA.industry_full) || {};
+        _fullMap = new Map();
+        if (F && F.groups) Object.keys(F.groups).forEach((g) => {
+          (F.groups[g].indicators || []).forEach((r) => { if (r && r.key) _fullMap.set(r.key, r); });
+        });
+      } catch (e) { _fullMap = null; }
+      _fullLoading = false; syncFullBtn();
+    }
+    fullBtn.addEventListener("click", async () => {
+      if (_fullLoading) return;
+      if (cur === curFull && curFull) { cur = cur10y; }
+      else {
+        if (!curFull) { await ensureFull(); curFull = curKey && _fullMap ? (_fullMap.get(curKey) || null) : null; }
+        if (curFull) cur = curFull;
+      }
+      syncFullBtn(); draw(mode);
+    });
 
     /* 季节性数据：按（年, 月）归位 12 格，多年各一条线（Charts 高亮当年=最大年）。
        日频序列每格被月末最后一个观测覆盖 → 月末价；周频序列取月末周观测。 */
@@ -103,17 +134,19 @@ function renderQuotes(root) {
         Charts.line(chartBox, {series: [{name: r.name || r.key, dates: r.dates || [], values: r.values || []}],
           yUnit: r.unit || "", range: "ALL"});
         seasonBtn.textContent = "季节性对比";
-        seasonNote.textContent = "全历史 · 可用顶部范围条缩放";
+        seasonNote.textContent = (cur === curFull && curFull ? "全历史" : "近10年") + " · 可用顶部范围条缩放";
       }
     }
     function openModal(r, g) {
-      cur = r;
+      cur10y = r; curFull = null; curKey = r && r.key; cur = r;
       titleEl.textContent = (r.name || r.key) + (r.unit ? "（" + r.unit + "）" : "");
       srcTag.textContent = srcOf(g);
       const ok = seasonOk(r);
       seasonBtn.style.display = ok ? "" : "none";
+      fullBtn.style.display = (r && (r.dates || []).length >= 2) ? "" : "none";
       modal.showModal();
       draw("line");
+      syncFullBtn();
       if (!ok) seasonNote.textContent = "历史不足两年，季节性不可用";
     }
 

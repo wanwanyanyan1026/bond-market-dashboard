@@ -39,7 +39,7 @@ const App = {
      核心段 + meta.vers 版本表（内容哈希），进入面板时才 fetch m_<sec>.json；
      未变模块 URL 不变，浏览器 immutable 缓存直接命中。 */
   SECS: {
-    home: ["institution", "liquidity"],
+    home: ["homesupp"],   // 首页摘要块（duration/wealth/netbuyMatrix/DR007），点摘要卡跳转面板时才拉整块
     institution: ["institution"],
     liquidity: ["liquidity"],
     industry: ["industry"],

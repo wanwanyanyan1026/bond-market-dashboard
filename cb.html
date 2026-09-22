@@ -47,6 +47,25 @@
 .dim-fill { display: block; height: 100%; border-radius: 4px; }
 .dim-val { width: 215px; white-space: nowrap; color: var(--text); flex: none; }
 .temp-verdict { font-size: 13px; text-align: center; line-height: 1.8; }
+/* info-bridge digest */
+.ib-meta { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+.ib-styles { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin: 2px 0 8px; }
+.ib-styles .lbl { font-size: 11px; color: var(--muted); }
+.ib-styles .chip { font-family: inherit; font-size: 11px; padding: 2px 10px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--muted); cursor: pointer; line-height: 1.6; }
+.ib-styles .chip:hover { color: var(--text); }
+.ib-styles .chip.active { background: var(--line); color: var(--text); font-weight: 600; }
+.ib-body { font-size: 14px; line-height: 1.75; color: var(--text); max-height: 520px; overflow-y: auto; padding-right: 6px; }
+.ib-body h1,.ib-body h2,.ib-body h3 { margin: 14px 0 4px; font-weight: 700; }
+.ib-body h1 { font-size: 16px; } .ib-body h2 { font-size: 15px; } .ib-body h3 { font-size: 14px; }
+.ib-body p { margin: 4px 0; }
+.ib-body ul,.ib-body ol { margin: 4px 0; padding-left: 22px; }
+.ib-body li { margin: 2px 0; }
+.ib-body strong { font-weight: 700; }
+.ib-body table { border-collapse: collapse; margin: 8px 0; font-size: 13px; }
+.ib-body th,.ib-body td { border: 1px solid var(--line); padding: 3px 8px; }
+.ib-body th { background: var(--line); font-weight: 700; }
+.ib-body blockquote { border-left: 3px solid var(--line); margin: 6px 0; padding: 2px 10px; color: var(--muted); }
+.ib-body code { background: var(--line); padding: 1px 4px; border-radius: 3px; font-size: 13px; }
 </style>
 </head>
 <body>
@@ -88,6 +107,23 @@
   </div>
 
   <div class="card">
+    <div class="badge" id="ib-badge">讯息之桥 · 每日简报</div>
+    <div class="card-title">A股复盘</div>
+    <div class="tabs" id="ib-period-tabs"></div>
+    <div class="tabs" id="ib-section-tabs" style="margin-bottom:6px"></div>
+    <div class="ib-styles" id="ib-style-tabs" style="display:none"></div>
+    <div class="ib-meta" id="ib-meta"></div>
+    <div class="ib-body" id="ib-body">—</div>
+    <div class="risk-note" id="ib-risk"></div>
+    <details id="htsc-details" style="margin-top:12px;border-top:1px dashed var(--line);padding-top:10px">
+      <summary style="cursor:pointer;font-size:13px;color:var(--muted);user-select:none">华泰复盘（补充 · 近5日）</summary>
+      <div class="tabs" id="htsc-tabs" style="margin-top:8px"></div>
+      <div class="review-body" id="htsc-body" style="max-height:340px">—</div>
+      <div class="risk-note" id="htsc-risk"></div>
+    </details>
+  </div>
+
+  <div class="card">
     <div class="badge">等权=100 归一 · 含中证转债(000832)对照 · 近一年 · 滚轮/拖拽缩放</div>
     <div class="card-title">转债等权指数 & 中位溢价率</div>
     <div class="chart" id="ch-index" style="height:360px"></div>
@@ -98,27 +134,57 @@
       <div class="chart" id="ch-pair" style="height:340px"></div>
     </div>
 
-  <div class="card">
-    <div class="badge">每日复盘 · 近5日</div>
-    <div class="card-title">A股复盘</div>
-    <div class="tabs" id="htsc-tabs"></div>
-    <div class="review-body" id="htsc-body">—</div>
-    <div class="risk-note" id="htsc-risk"></div>
-  </div>
-
   <div class="grid grid-2">
     <div class="card">
       <div class="badge">日频 · 最新 <span id="emo-date">—</span></div>
       <div class="card-title">A股情绪指数（近90日）</div>
       <div class="chart" id="ch-emo"></div>
+      <div id="crowding-block" style="display:none; margin-top:12px; border-top:1px dashed var(--line); padding-top:12px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:8px">行业拥挤度 <span id="crd-badge" style="font-weight:400;color:var(--muted)"></span></div>
+        <div class="grid grid-2" style="gap:12px">
+          <div>
+            <div id="crd-gauge" style="text-align:center;font-size:32px;font-weight:700;padding:6px 0">—</div>
+            <div id="crd-dims" class="kpi-row" style="justify-content:center;font-size:11px"></div>
+          </div>
+          <div>
+            <table class="tbl" id="crd-tbl" style="font-size:11px"></table>
+          </div>
+        </div>
+      </div>
       <div class="risk-note" id="emo-risk"></div>
     </div>
     <div class="card">
-      <div class="badge">周频披露 · 最新 <span id="cap-date">—</span>（口径滞后约 1 周）</div>
-      <div class="card-title">A股资金面（周频）</div>
-      <div id="tbl-capital"></div>
+      <div class="badge">周频披露 · 最新 <span id="cap-date">—</span>（口径滞后约 1 周）· 单位亿元</div>
+      <div class="card-title">A股资金面（6 指标 · 周频）</div>
+      <div class="grid grid-3" id="cap-kpis"></div>
+      <div id="flow-chart-block" style="display:none; margin-top:10px; border-top:1px dashed var(--line); padding-top:10px">
+        <div style="font-size:12px;font-weight:700;margin-bottom:6px">行业聪明钱背离度 Top10 <span id="fl-badge" style="font-weight:400;color:var(--muted)"></span></div>
+        <div class="chart" id="ch-flow" style="height:260px"></div>
+      </div>
       <div class="risk-note" id="cap-risk"></div>
     </div>
+  </div>
+
+  <div class="card">
+    <div class="badge">日频 · 份额截至 <span id="ea-date">—</span> · 净流入 = Δ份额×收盘</div>
+    <div class="card-title">A股ETF资金流向（全市场 · 日频）</div>
+    <div class="grid grid-3" id="ea-kpis"></div>
+    <div class="grid grid-2">
+      <div>
+        <div class="card-sub">分类净流入（亿元/日 · 堆叠）</div>
+        <div class="chart" id="ch-ea" style="height:250px"></div>
+      </div>
+      <div id="ea-tbl"></div>
+    </div>
+    <div class="risk-note">口径：净申购 = Δ份额×收盘价。沪市份额 = 上交所官方披露；深市份额 = 腾讯行情规模÷收盘推算（市值字段已与官方份额交叉验证）；分类按基金名称关键词（货币→债券→商品→跨境优先级）。数据来源：上交所、腾讯行情。基线日起次日有净流入。</div>
+  </div>
+
+  <div class="card">
+    <div class="badge">日频 · 份额截至 <span id="etf-date">—</span> · 净流入 = Δ份额×收盘价</div>
+    <div class="card-title">转债ETF资金（日频）</div>
+    <div class="grid grid-3" id="etf-kpis"></div>
+    <div class="chart" id="ch-etf" style="height:250px"></div>
+    <div class="risk-note">份额 = 上交所 ETF 规模披露（仅交易日有数，亿份）；价格 = 前复权收盘价。数据来源：上交所、腾讯行情。</div>
   </div>
 
   <div class="grid grid-2">
@@ -143,6 +209,24 @@
     <div class="card-title">当日热点主题</div>
     <div class="card-sub" id="thm-note"></div>
     <div id="tbl-themes"></div>
+  </div>
+
+  <div class="card">
+    <div class="badge">月频 · 最新 <span id="hld-date">—</span> · 沪市 = 持有面值 / 深市 = 成交金额</div>
+    <div class="card-title">转债投资者结构（沪市持有 + 深市交易拼盘）</div>
+    <div class="grid grid-2">
+      <div>
+        <div class="card-sub">沪市可转债持有面值（亿元 · 按投资者类别 · 17 类归并 8 组）</div>
+        <div class="chart" id="ch-hld" style="height:380px"></div>
+      </div>
+      <div>
+        <div class="card-sub" id="hld-latest-sub">最新月持有结构（沪市）</div>
+        <div id="hld-latest"></div>
+        <div class="card-sub" style="margin-top:14px">深市可转债月度成交（亿元）</div>
+        <div class="chart" id="ch-szse" style="height:170px"></div>
+      </div>
+    </div>
+    <div class="risk-note">口径说明：沪市持有 = 上交所月度统计（可转债持有面值、月末数、披露滞后约 1 个月）；深交所不披露投资者持有结构，右下为深市可转债月度成交金额（交易口径，非持有）。与集思录「转债投资者持有与交易结构」页同源口径（持有 = 面值），建议每月人工核对。数据来源：上交所 / 深交所网站。</div>
   </div>
 </section>
 
@@ -200,7 +284,7 @@
 
 </main>
 
-<script src="assets/data/data.js?v=cb-28"></script>
+<script src="assets/data/data.js?v=cb-32"></script>
 <script src="assets/js/echarts.min.js"></script>
 <script>
 /* ============================================================
@@ -354,14 +438,147 @@ const remCell = m => m.rem == null ? "—" :
       {type: "line", data: [[-11, -11], [11, 11]], symbol: "none", silent: true,
        lineStyle: {color: "#587086", type: "dashed", width: 1}}]});
 
-  /* 华泰复盘：日期 tab + 正文 + 风险揭示（skill 合规格式，不截断） */
+  /* ── info-bridge digest（A股复盘主源） ── */
+  const ib = R.ib_digest;
+  const ibBody = document.getElementById("ib-body");
+  const ibMeta = document.getElementById("ib-meta");
+  const ibBadge = document.getElementById("ib-badge");
+  const ibRisk = document.getElementById("ib-risk");
+  const IB_RISK = "风险揭示：以上内容由讯息之桥投研知识库生成，数据来源包括卖方点评、市场传闻、研报纪要、产业反馈等，可能省略重要风险信息，请务必阅读完整原始报告。以上内容仅供研究学习使用，不构成任何投资建议。";
+
+  /* simple markdown→html (headings/bold/list/table/blockquote/code) */
+  function md2html(s) {
+    return s
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+      .replace(/^### (.+)$/gm,"<h3>$1</h3>").replace(/^## (.+)$/gm,"<h2>$1</h2>").replace(/^# (.+)$/gm,"<h1>$1</h1>")
+      .replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>")
+      .replace(/^> (.+)$/gm,"<blockquote>$1</blockquote>")
+      .replace(/`([^`]+)`/g,"<code>$1</code>")
+      .replace(/^- (.+)$/gm,"<li>$1</li>")
+      .replace(/(<li>.*<\/li>\n?)+/g,m=>"<ul>"+m+"</ul>")
+      .replace(/^(\|.+\|)$/gm,(m)=>m) /* table lines pass-through */
+      .replace(/(?:^\|.+\|\n?)+/gm,m=>{
+        const rows=m.trim().split("\n").filter(l=>!/^\|[\s\-|]+\|$/.test(l));
+        if(rows.length<1)return m;
+        return "<table>"+rows.map((r,i)=>{
+          const cells=r.trim().replace(/^\||\|$/g,"").split("|").map(c=>c.trim());
+          const tag=i===0?"th":"td";
+          return "<tr>"+cells.map(c=>`<${tag}>${c}</${tag}>`).join("")+"</tr>";
+        }).join("")+"</table>";
+      })
+      .replace(/\n{2,}/g,"</p><p>").replace(/\n/g,"<br>")
+      .replace(/^/,"<p>").replace(/$/,"</p>");
+  }
+
+  if (ib && ib.daily) {
+    /* 周期 tab：daily / weekly；风格版单独一排小 chips（tab 行不过长） */
+    const periodTabs = document.getElementById("ib-period-tabs");
+    const sectionTabs = document.getElementById("ib-section-tabs");
+    const styleRow = document.getElementById("ib-style-tabs");
+    const STYLE_LABELS = {tmt:"TMT", manufacturing:"高端制造", cyclical:"周期", consumer:"消费", dividend:"红利"};
+    const allPeriods = [{k:"daily", label:"每日", d:ib.daily}];
+    if (ib.weekly) allPeriods.push({k:"weekly", label:"周报", d:ib.weekly});
+    const styleKeys = ib.styles ? Object.keys(ib.styles) : [];
+
+    function renderDigest(d, sectionFilter) {
+      ibMeta.textContent = [d.key, d.period, d.updated_at].filter(Boolean).join(" · ");
+      const content = d.content || "";
+      if (sectionFilter && d.sections && d.sections.length > 1) {
+        /* 按标题切 section — 找 ## 对应的 section 名 */
+        const sectionHeaders = {"macro":"宏观","market":"资本市场","industry":"行业"};
+        const target = sectionHeaders[sectionFilter] || sectionFilter;
+        const lines = content.split("\n");
+        let inSection = false, collecting = false, depth = 0;
+        const out = [];
+        for (const line of lines) {
+          if (/^## /.test(line)) {
+            if (collecting && depth > 0) { depth--; if (depth === 0) { collecting = false; continue; } }
+            if (line.includes(target)) { inSection = true; collecting = true; depth = 1; out.push(line); continue; }
+            else if (collecting) { collecting = false; continue; }
+          }
+          if (collecting) out.push(line);
+        }
+        ibBody.innerHTML = out.length ? md2html(out.join("\n")) : md2html(content);
+      } else {
+        ibBody.innerHTML = md2html(content);
+      }
+      ibRisk.textContent = IB_RISK;
+    }
+
+    let currentDigest = ib.daily;
+    allPeriods.forEach((p, i) => {
+      const b = document.createElement("button");
+      b.className = "tab" + (i === 0 ? " active" : "");
+      b.textContent = p.label;
+      b.onclick = () => {
+        periodTabs.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t === b));
+        styleRow.querySelectorAll(".chip").forEach(t => t.classList.remove("active"));
+        currentDigest = p.d;
+        buildSectionTabs(p.d);
+        renderDigest(p.d, null);
+        ibBadge.textContent = p.k === "weekly" ? "讯息之桥 · 周报" : "讯息之桥 · 每日简报";
+      };
+      periodTabs.appendChild(b);
+    });
+
+    /* 风格版 chips：daily 的风格收窄版，独立小标签行 */
+    if (styleKeys.length) {
+      styleRow.style.display = "flex";
+      const lbl = document.createElement("span");
+      lbl.className = "lbl"; lbl.textContent = "风格版";
+      styleRow.appendChild(lbl);
+      styleKeys.forEach(v => {
+        const c = document.createElement("button");
+        c.className = "chip"; c.textContent = STYLE_LABELS[v] || v;
+        c.onclick = () => {
+          styleRow.querySelectorAll(".chip").forEach(t => t.classList.toggle("active", t === c));
+          periodTabs.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+          currentDigest = ib.styles[v];
+          buildSectionTabs(ib.styles[v]);
+          renderDigest(ib.styles[v], null);
+          ibBadge.textContent = "讯息之桥 · " + (STYLE_LABELS[v] || v) + "版";
+        };
+        styleRow.appendChild(c);
+      });
+    }
+
+    function buildSectionTabs(d) {
+      sectionTabs.innerHTML = "";
+      if (!d.sections || d.sections.length <= 1) return;
+      const all = document.createElement("button");
+      all.className = "tab active"; all.textContent = "全文";
+      all.onclick = () => {
+        sectionTabs.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t === all));
+        renderDigest(d, null);
+      };
+      sectionTabs.appendChild(all);
+      const sectionLabels = {"macro":"宏观","market":"资本市场","industry":"行业"};
+      d.sections.forEach(s => {
+        const b = document.createElement("button");
+        b.className = "tab"; b.textContent = sectionLabels[s] || s;
+        b.onclick = () => {
+          sectionTabs.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t === b));
+          renderDigest(d, s);
+        };
+        sectionTabs.appendChild(b);
+      });
+    }
+
+    buildSectionTabs(ib.daily);
+    renderDigest(ib.daily, null);
+    if (ib.daily.routed_from) ibBadge.textContent = "讯息之桥 · " + (ib.daily.routed_from);
+  } else {
+    ibBody.textContent = "未获取 info-bridge 简报（IB_TOKEN 未配置或接口失败）。";
+    document.getElementById("ib-period-tabs").style.display = "none";
+    document.getElementById("ib-section-tabs").style.display = "none";
+  }
+
+  /* ── HTSC 复盘（折叠补充） ── */
   const htsc = R.htsc || [];
   const tabs = document.getElementById("htsc-tabs");
   const body = document.getElementById("htsc-body");
   if (!htsc.length) {
-    tabs.style.display = "none";
-    body.textContent = "未识别到复盘数据（HTSC_APP_KEY 未配置或接口失败）。请前往行知 App 或行知网页版，进入「华泰智研 Skill 及 MCP 专区」，点击「API KEY」查看并配置后重跑 update。";
-    document.getElementById("htsc-risk").textContent = RISK;
+    document.getElementById("htsc-details").style.display = "none";
   } else {
     htsc.forEach((it, i) => {
       const b = document.createElement("button");
@@ -395,15 +612,136 @@ const remCell = m => m.rem == null ? "—" :
     document.getElementById("ch-emo").innerHTML = `<div class="empty">本期未获取（接口失败或未配置）</div>`;
   }
   document.getElementById("emo-risk").textContent = RISK;
+  /* 拥挤度：合并到情绪指数卡片 */
+  const crdMkt = (extra.crowding_mkt || [])[0];
+  if (crdMkt) {
+    document.getElementById("crowding-block").style.display = "";
+    document.getElementById("crd-badge").textContent = `· ${crdMkt.trade_date || ""}`;
+    const pct = crdMkt.crowding_pct;
+    const el = document.getElementById("crd-gauge");
+    el.textContent = pct != null ? pct.toFixed(1) : "—";
+    el.className = pct >= 80 ? "up" : pct <= 20 ? "down" : "";
+    document.getElementById("crd-dims").innerHTML =
+      [`结构${fmt2(crdMkt.structure_z)}`, `换手${fmt2(crdMkt.turnover_z)}`,
+       `趋势${fmt2(crdMkt.trend_z)}`, `估值${fmt2(crdMkt.valuation_z)}`]
+      .map(s => `<span style="margin:0 6px">${s}</span>`).join("");
+    const top5 = extra.crowding_top5 || [], bot5 = extra.crowding_bot5 || [];
+    document.getElementById("crd-tbl").innerHTML = tblHTML(
+      [{t:""}, {t:"拥挤分位",num:1}],
+      [
+        ...top5.map(r => [`<span class="up">▲</span> ${r.name}`, `${r.crowding_pct?.toFixed(1)}`]),
+        ["—","—"],
+        ...bot5.map(r => [`<span class="down">▼</span> ${r.name}`, `${r.crowding_pct?.toFixed(1)}`])
+      ]);
+  }
+  /* 资金面精简为 KPI 块：短名 + 带符号值 + 各自披露日 */
+  const CAP_SHORT = {"散户资金净流入": "散户资金", "ETF资金": "ETF资金", "融资资金": "融资资金",
+                     "主动偏股公募基金(存量+新增规模)": "公募偏股", "产业资本减持": "产业资本减持", "一级市场": "一级市场"};
   const cap = extra.capital || [];
+  document.getElementById("cap-kpis").innerHTML = cap.length
+    ? cap.map(c => kpi(CAP_SHORT[c[0]] || c[0],
+        `<span class="${updown(c[2])}">${(c[2] > 0 ? "+" : "") + c[2]}</span>`,
+        `${String(c[1]).slice(5)} · ${c[3] || "亿元"}`)).join("")
+    : `<div class="empty">本期未获取（接口失败或未配置）</div>`;
   const capDs = cap.map(c => String(c[1])).filter(s => /^\d{4}-\d{2}-\d{2}$/.test(s)).sort();
   document.getElementById("cap-date").textContent = capDs.length ? capDs[capDs.length - 1].slice(5) : "—";
-  document.getElementById("tbl-capital").innerHTML = cap.length
-    ? tblHTML([{t: "指标"}, {t: "最新值", num: 1}, {t: "日期", num: 1}],
-        cap.map(c => [c[0], `<span class="${updown(c[2])}">${(c[2] > 0 ? "+" : "") + c[2]}</span> ${c[3] || ""}`,
-                      String(c[1]).slice(5)]))
-    : `<div class="empty">本期未获取（接口失败或未配置）</div>`;
   document.getElementById("cap-risk").textContent = RISK;
+  /* 资金流向结构：合并到资金面卡片 */
+  const flSmart = extra.flow_smart10 || [];
+  if (flSmart.length) {
+    document.getElementById("flow-chart-block").style.display = "";
+    const flMkt = (extra.flow_mkt || [])[0];
+    document.getElementById("fl-badge").textContent = flMkt?.trade_date ? `· ${flMkt.trade_date}` : "";
+    ch("ch-flow", {
+      tooltip: {trigger: "axis", formatter: p => `${p.name}<br>聪明钱背离度 ${p.value > 0 ? "+" : ""}${Number(p.value).toFixed(4)}`},
+      grid: {left: 70, right: 20, top: 8, bottom: 24},
+      xAxis: {type: "value", axisLabel: {fontSize: 10, formatter: v => (v > 0 ? "+" : "") + v.toFixed(2)}},
+      yAxis: {type: "category", inverse: true, data: flSmart.map(r => r.name),
+              axisLabel: {fontSize: 10}},
+      series: [{type: "bar", data: flSmart.map(r => ({
+                value: r.smart_dumb_div,
+                itemStyle: {color: r.smart_dumb_div > 0 ? "#c2413b" : r.smart_dumb_div < 0 ? "#1f8a5c" : "#8a97a5"}
+              }))}]
+    });
+  }
+
+  /* A股ETF资金流向（全市场·日频）：净申购=Δ份额×收盘，5类拆分 */
+  const ea = R.etfAll || [];
+  if (ea.length) {
+    const last = ea[ea.length - 1], a = last.agg || [];
+    const EAC = [["股票", "#2a78d6"], ["债券", "#eb6834"], ["商品", "#4a3aa7"], ["跨境", "#c98f00"], ["货币", "#e87ba4"]];
+    document.getElementById("ea-date").textContent = (last.date || "").slice(5);
+    if ((last.in || []).length + (last.out || []).length) {
+      const w = ea.slice(-40);
+      const cum5 = w.slice(-5).reduce((s, r) => s + ((r.agg || [])[0] || 0), 0);
+      document.getElementById("ea-kpis").innerHTML =
+        kpi("当日净流入（全市场）", (a[0] > 0 ? "+" : "") + fmt2(a[0]), `亿元 · ${a[6] || "—"} 只ETF`, updown(a[0])) +
+        kpi("其中股票型", (a[1] > 0 ? "+" : "") + fmt2(a[1]), "亿元", updown(a[1])) +
+        kpi("近5日累计", (cum5 > 0 ? "+" : "") + fmt2(Math.round(cum5 * 10) / 10), "亿元", updown(cum5));
+      ch("ch-ea", {
+        tooltip: {trigger: "axis",
+          formatter: ps => { const i = ps[0].dataIndex, r = w[i] || {}, ra = r.agg || [];
+            return `${r.date}<br>合计 <b>${((ra[0] || 0) > 0 ? "+" : "") + fmt2(ra[0] || 0)}</b> 亿元<br>` +
+              EAC.map(([n], ci) => `${n} ${fmt2(ra[ci + 1] || 0)}`).join("<br>"); }},
+        legend: {top: 0, itemWidth: 10, itemHeight: 10, textStyle: {fontSize: 10}},
+        grid: {left: 46, right: 16, top: 30, bottom: 24},
+        xAxis: {type: "category", data: w.map(r => r.date),
+                axisLabel: {fontSize: 10, hideOverlap: true, formatter: v => v.slice(5)}},
+        yAxis: {type: "value", name: "亿元"},
+        series: EAC.map(([n, c], ci) => ({name: n, type: "bar", stack: "e", barMaxWidth: 18,
+          itemStyle: {color: c}, data: w.map(r => (r.agg || [])[ci + 1] || 0)}))});
+      const fcell = f => `<span class="${updown(f[2])}">${(f[2] > 0 ? "+" : "") + fmt2(f[2])}</span>`;
+      const mk = (t, fs) => `<div class="card-sub" style="margin-top:2px">${t}</div>` + tblHTML(
+        [{t: "ETF"}, {t: "净流入(亿)", num: 1}],
+        fs.map(f => [`${f[1]} <span style="color:var(--muted);font-size:11px">${f[0]}</span>`, fcell(f)]));
+      document.getElementById("ea-tbl").innerHTML = mk("当日净流入 Top8", last.in || []) +
+        `<div style="height:10px"></div>` + mk("当日净流出 Top6", last.out || []);
+    } else {  // 首日基线：无前日份额快照，Δ 不可算
+      document.getElementById("ea-kpis").innerHTML =
+        kpi("已入库ETF", a[6] || "—", "只 · 沪市官方+深市推算") +
+        kpi("基线日", (last.date || "").slice(5), "份额快照已保存") +
+        kpi("净流入", "次日起", "展示");
+      document.getElementById("ea-tbl").innerHTML =
+        `<div class="empty">今日为首个采集日（无前日份额快照）：${a[6] || "—"} 只 ETF 份额已入库为基线，明日起计算并展示每日净流入。</div>`;
+      document.getElementById("ch-ea").innerHTML = "";
+    }
+  } else {
+    document.getElementById("ea-kpis").innerHTML = `<div class="empty">本期未获取（接口失败）</div>`;
+    document.getElementById("ch-ea").innerHTML = "";
+  }
+
+  /* 转债ETF资金（日频）：份额=上交所ETF规模披露，净流入=Δ份额×收盘价 */
+  const etf = R.etf || [];
+  if (etf.length > 1) {
+    const ECODES = [["转债ETF(511380)", 0], ["上证转债(511180)", 1]];
+    document.getElementById("etf-date").textContent = etf[etf.length - 1][0].slice(5);
+    const flow = ci => etf.map((r, i) => i && r[1 + ci] != null && etf[i - 1][1 + ci] != null && r[3 + ci] != null
+      ? Math.round((r[1 + ci] - etf[i - 1][1 + ci]) * r[3 + ci] * 10) / 10 : null);
+    const flows = [flow(0), flow(1)];
+    document.getElementById("etf-kpis").innerHTML = ECODES.map(([n, ci]) => {
+      const f = flows[ci], last = etf[etf.length - 1];
+      const f5 = f.slice(-5).reduce((a, b) => a + (b || 0), 0);
+      return kpi(`${n} 份额`, fmt2(last[1 + ci]), "亿份") +
+             kpi("当日净流入", (f[f.length - 1] > 0 ? "+" : "") + fmt2(f[f.length - 1]), "亿元", updown(f[f.length - 1])) +
+             kpi("近5日净流入", (f5 > 0 ? "+" : "") + fmt2(Math.round(f5 * 10) / 10), "亿元", updown(f5));
+    }).join("");
+    const w = etf.slice(-40), fw = [flows[0].slice(-40), flows[1].slice(-40)];
+    const tot = fw[0].map((v, i) => Math.round(((v || 0) + (fw[1][i] || 0)) * 10) / 10);
+    ch("ch-etf", {
+      tooltip: {trigger: "axis",
+        formatter: ps => { const i = ps[0].dataIndex;
+          return `${w[i][0]}<br>合计 <b>${(tot[i] > 0 ? "+" : "") + tot[i]}</b> 亿元<br>` +
+            ECODES.map(([n, ci]) => `${n.replace(/\(.*/, "")} ${(fw[ci][i] == null ? "—" : (fw[ci][i] > 0 ? "+" : "") + fw[ci][i])}（份额 ${fmt2(w[i][1 + ci])}）`).join("<br>"); }},
+      grid: {left: 46, right: 16, top: 14, bottom: 24},
+      xAxis: {type: "category", data: w.map(r => r[0]),
+              axisLabel: {fontSize: 10, hideOverlap: true, formatter: v => v.slice(5)}},
+      yAxis: {type: "value", name: "亿元"},
+      series: [{type: "bar", data: tot.map(v => ({value: v,
+                itemStyle: {color: v > 0 ? "#c2413b" : v < 0 ? "#1f8a5c" : "#8a97a5"}}))}]});
+  } else {
+    document.getElementById("etf-kpis").innerHTML = `<div class="empty">本期未获取（接口失败）</div>`;
+    document.getElementById("ch-etf").innerHTML = "";
+  }
 
   /* 涨跌榜（联动对照 + 申万行业） */
   const indCell = m => m.ind ? `<span style="font-size:11px;color:var(--muted)">${m.ind}</span>` : "—";
@@ -453,6 +791,62 @@ const remCell = m => m.rem == null ? "—" :
         (t.cbs || []).length ? t.cbs.map(c => `${c.b} <span class="${updown(c.cb)}">${pct(c.cb)}</span> <span style="font-size:11px;color:var(--muted)">(${c.skn} ${pct(c.sp)})</span>`).join("<br>") : "—"]));
   } else {
     document.getElementById("tbl-themes").innerHTML = `<div class="empty">本期未生成（概念成分/行情缺失）</div>`;
+  }
+
+  /* 持有人结构（月频）：沪市17类→8组堆叠 + 最新月明细表 + 深市月度成交 */
+  const hld = R.holder || [];
+  if (hld.length) {
+    const GRP = [["公募基金", ["公募基金"]], ["年金&社保", ["企业年金", "社会保障基金"]],
+                 ["私募&资管", ["私募基金", "证券公司资管", "基金管理公司资产管理计划", "信托机构"]],
+                 ["自然人", ["自然人投资者"]],
+                 ["一般机构", ["一般机构", "财务公司", "其他金融机构"]],
+                 ["券商自营", ["证券公司自营"]],
+                 ["保险&外资", ["保险机构", "QFII、RQFII", "沪股通投资者"]],
+                 ["银行", ["银行理财", "银行自营"]]];
+    const HC = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"];
+    const gv = rec => GRP.map(([, ks]) =>
+      ks.reduce((a, k) => a + ((rec.rows.find(r => r[0] === k) || [0, 0])[1] || 0), 0));
+    document.getElementById("hld-date").textContent = hld[hld.length - 1].month.slice(0, 7);
+    const gvAll = hld.map(gv);
+    ch("ch-hld", {
+      tooltip: {trigger: "axis",
+        formatter: ps => { const i = ps[0].dataIndex;
+          const t = gvAll[i].reduce((a, b) => a + b, 0);
+          return `${hld[i].month.slice(0, 7)} 合计 <b>${fmt2(t)}</b> 亿元<br>` +
+            ps.map(p => `${p.marker}${p.seriesName} ${fmt2(gvAll[i][p.seriesIndex])}`).join("<br>"); }},
+      legend: {top: 0, type: "scroll", textStyle: {fontSize: 11}, itemWidth: 14, itemHeight: 9},
+      grid: {left: 52, right: 16, top: 46, bottom: 26},
+      xAxis: {type: "category", data: hld.map(h => h.month.slice(2, 7))},
+      yAxis: {type: "value", name: "亿元"},
+      series: GRP.map(([n], i) => ({name: n, type: "bar", stack: "t", color: HC[i],
+        itemStyle: {borderColor: "#fff", borderWidth: 1},
+        data: gvAll.map(v => Math.round(v[i]))}))});
+    const lv = gvAll[gvAll.length - 1], pv = gvAll.length > 1 ? gvAll[gvAll.length - 2] : null;
+    const totL = hld[hld.length - 1].total || lv.reduce((a, b) => a + b, 0);
+    document.getElementById("hld-latest-sub").textContent =
+      `最新月持有结构（沪市 · ${hld[hld.length - 1].month.slice(0, 7)} · 合计 ${fmt2(totL)} 亿元面值）`;
+    document.getElementById("hld-latest").innerHTML = tblHTML(
+      [{t: "投资者（沪市）"}, {t: "面值亿", num: 1}, {t: "占比%", num: 1}, {t: "环比亿", num: 1}],
+      GRP.map(([n], i) => [`<span class="strong">${n}</span>`, fmt2(lv[i]),
+        (lv[i] / totL * 100).toFixed(1),
+        pv ? `<span class="${updown(lv[i] - pv[i])}">${(lv[i] - pv[i] > 0 ? "+" : "") + fmt2(Math.round((lv[i] - pv[i]) * 10) / 10)}</span>` : "—"]));
+    const sz = hld.filter(h => h.szseKzz != null);
+    if (sz.length > 1) {
+      ch("ch-szse", {
+        tooltip: {formatter: p => `${p.name}：${fmt2(p.value)} 亿元`},
+        grid: {left: 50, right: 12, top: 14, bottom: 24},
+        xAxis: {type: "category", data: sz.map(h => h.month.slice(2, 7)),
+                axisLabel: {fontSize: 10, hideOverlap: true}},
+        yAxis: {type: "value", scale: true, name: "亿元"},
+        series: [{type: "bar", color: "#1769aa", itemStyle: {borderColor: "#fff", borderWidth: 1},
+                  data: sz.map(h => h.szseKzz)}]});
+    } else {
+      document.getElementById("ch-szse").innerHTML = `<div class="empty">深市成交未获取</div>`;
+    }
+  } else {
+    document.getElementById("ch-hld").innerHTML = `<div class="empty">本期未获取（接口失败）</div>`;
+    document.getElementById("hld-latest").innerHTML = `<div class="empty">本期未获取（接口失败）</div>`;
+    document.getElementById("ch-szse").innerHTML = "";
   }
 })();
 

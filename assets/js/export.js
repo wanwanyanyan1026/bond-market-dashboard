@@ -6,8 +6,16 @@
 
 const Export = {
 
-  /* 入口：导出某模块数据为 Excel */
+  /* 入口：导出某模块数据为 Excel（xlsx 首次点导出时才加载，首屏不再预载 930KB） */
   module(mod) {
+    if (typeof XLSX === "undefined") {
+      const s = document.createElement("script");
+      s.src = "assets/js/vendor/xlsx.min.js";
+      s.onload = () => Export.module(mod);
+      s.onerror = () => alert("导出组件加载失败，请检查网络后重试");
+      document.head.append(s);
+      return;
+    }
     const D = (typeof DATA !== "undefined" && DATA) || {};
     const wb = XLSX.utils.book_new();
     const add = (name, rows) => {

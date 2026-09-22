@@ -25,10 +25,9 @@
 </main>
 
 <!-- 依序：数据 → 图表库 → 图表封装 → 导出 → 各面板注册 → 应用路由 -->
-<script src="assets/data/data.js?v=2026-09-21.1008"></script>
+<script src="assets/data/data.js?v=2026-09-22.0906"></script>
 <script src="assets/js/echarts.min.js"></script>
 <script src="assets/js/charts.js"></script>
-<script src="assets/js/vendor/xlsx.min.js"></script>
 <script src="assets/js/export.js"></script>
 <script>
 /* ============================================================
@@ -151,13 +150,15 @@ PANELS["home"] = {
     ]);
 
     /* —— 3. 六板块摘要小图（300px 级卡片，点击跳转对应面板）—— */
-    const rs = (D.liquidity && D.liquidity.rateSeries) || {};
+    const rs = ((D.homesupp && D.homesupp.liquidity && D.homesupp.liquidity.rateSeries)
+      || (D.liquidity && D.liquidity.rateSeries)) || {};   // 摘要块优先，回退整块
     const rateKey = rs.DR007 ? "DR007" : rs.FDR007 ? "FDR007" : rs.FR007 ? "FR007" : null;   // 成交口径优先，定盘次之
     const ratePick = rateKey ? rs[rateKey] : null;
     const ws = (D.fiscal && D.fiscal.weeklySupply) || {};
-    const du = (D.institution && D.institution.duration) || {};
-    const we = (D.institution && D.institution.wealth) || {};
-    const nb = (D.institution && D.institution.netbuyMatrix) || {};
+    const hd = (D.homesupp && D.homesupp.institution) || {};   // 首页摘要块，回退整块
+    const du = hd.duration || (D.institution && D.institution.duration) || {};
+    const we = hd.wealth || (D.institution && D.institution.wealth) || {};
+    const nb = hd.netbuyMatrix || (D.institution && D.institution.netbuyMatrix) || {};
     const pmi = ((D.fundamentals && D.fundamentals.macroTable) || [])
       .find(r => /PMI/.test((r && r.key) || "") || /PMI/.test((r && r.name) || "")) || null;
 
@@ -1005,14 +1006,14 @@ PANELS["curve"] = {
 </script>
 
 <script>
-/* 宏观观察入口（macro3.html 独立子页：财政/流动性/货币信用 三张 PPT 版式宏观页，月度） */
+/* 宏观观察入口（宏观观察面板.html 模块主页：tab = 八模块全景（默认）+ 宏观三页 iframe，macro3.html 本体零改动） */
 (function addMacro3Link() {
   var nav = document.getElementById("nav");
   if (nav && nav.children.length) {
     var a = document.createElement("a");
-    a.className = "menu-link"; a.href = "macro3.html";
+    a.className = "menu-link"; a.href = "宏观观察面板.html";
     a.innerHTML = '<i class="menu-ico">🌍</i>宏观观察';
-    a.title = "宏观三页：财政融资端 / 流动性综合 / 货币信用四象限（月度）";
+    a.title = "八模块全景（默认）+ 宏观三页：财政融资端 / 流动性综合 / 货币信用四象限（tab 切换）";
     /* 挂到「可转债模块」外链之前（生成报告保持侧栏最底部） */
     var cb = nav.querySelector('a.menu-link[href="cb.html"]');
     cb ? nav.insertBefore(a, cb) : nav.appendChild(a);

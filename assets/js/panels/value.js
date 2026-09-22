@@ -1,6 +1,6 @@
 /* ============================================================
    panels/value.js — 相对价值（Phase B Task 7）
-   四卡（消费 data.js value 段，Task 6 派生）：
+   六卡（消费 data.js value 段，Task 6 派生）：
      ① 期限利差——10Y-1Y / 30Y-1Y 双线同轴 bp；副标题当前值 + 3年分位
      ② 国开-国债——利差线 + 隐含税率线同卡两图（超储卡先例：单位不同
         各自单轴，禁双轴）；tax 无 pct3y（数据侧未派生）→ 副标题不显示分位
@@ -11,6 +11,12 @@
         上图原值 %（同单位可共轴）、下图利差 bp；租金 2 点极稀疏以文字条
         点标注如实呈现（封装无 markPoint，OMO 卡 MLF 标注先例）；
         短序列（≤3 点，分位为全史回退数学结果）不展示分位；租金缺时「待手录」
+     ⑤ 股息率 vs 国债收益率（保险比价）——上：红利股息率（中证红利全史 2005 起）
+        与国债 30Y/10Y 三线 %；下：利差 bp + 200bp 经验参考虚线（非硬阈值）；
+        展示于贷款卡上方
+     ⑥ 贷款 vs 国债收益率（银行比价·EVA口径）——上：一般贷款利率 / 调整后贷款
+        收益率(扣增值税·所得税·资本占用·信用成本) / 国债10Y 三线 %；下：名义
+        利差与 EVA利差 bp + 0 贷债平衡虚线；置于贷款卡上方
    消费：App.h / App.fmt / App.badge（app.js）、Charts.line（charts.js）
    ============================================================ */
 PANELS["value"] = {
@@ -131,10 +137,77 @@ PANELS["value"] = {
       ] : h("div", {class: "empty"}, ["房贷/租金数据待接入（货政报告 / manual_inputs）"]),
     ]);
 
+    /* —— ⑤ 股息率 vs 国债收益率（保险比价）：置于贷款卡上方 ——
+       上：红利股息率(2005 起全史) 与 国债30Y/10Y 三线 % 各按自身 dates；
+       下：股息率−国债 利差 bp（30Y 保险超长债主口径 / 10Y 辅助）+ 200bp 经验
+       参考虚线（≈近四年中枢，非硬阈值，markLine 挂 series[0]，charts.js 封装） */
+    const DV = V.divVsBond || {};
+    const dvGet = (k) => (DV[k] && Array.isArray(DV[k].dates) && DV[k].dates.length && has(DV[k].values))
+      ? {name: k, dates: DV[k].dates, values: DV[k].values, src: DV[k]} : null;
+    const dvDy = dvGet("股息率"), dv30 = dvGet("国债30Y"), dv10 = dvGet("国债10Y"),
+          dvS30 = dvGet("利差-30Y"), dvS10 = dvGet("利差-10Y");
+    const dvLevel = [dvDy, dv30, dv10].filter(Boolean);   // 同单位 % 共轴
+    const dvSpread = [dvS30, dvS10].filter(Boolean);      // 同单位 bp 共轴
+    const dvAny = dvLevel.length || dvSpread.length;
+    const dvLvBox = h("div", {id: "value-dy-level-chart", class: "chart", style: {height: "260px"}});
+    const dvSpBox = h("div", {id: "value-dy-spread-chart", class: "chart", style: {height: "260px"}});
+    const dvSub = [];
+    if (dvS30) dvSub.push("利差-30Y 当前 " + App.fmt(lastNum(dvS30.values), 2) + "bp" + pctTxt(dvS30.src));
+    if (dvS10) dvSub.push("利差-10Y 当前 " + App.fmt(lastNum(dvS10.values), 2) + "bp" + pctTxt(dvS10.src));
+    const dyCard = h("section", {class: "card", id: "value-dy-card"}, [
+      h("h3", {class: "card-title"}, ["股息率 vs 国债收益率（保险比价）"]),
+      App.badge("自建存储 · 中证红利(000922/H00922) / 国债曲线", fetchedAt),
+      h("p", {class: "card-sub"}, [dvAny
+        ? "保险 FVOCI 股息收益 vs 超长债票息比价 · 上：股息率 2005 起与国债 30Y/10Y（2022 起，各按自身 dates）"
+          + " · 下：利差 bp（30Y 主口径 / 10Y 辅助）" + (dvSub.length ? " · " + dvSub.join(" · ") : "")
+        : "红利股息率待接入"]),
+      dvAny ? [
+        cap("原值（%）—— 红利股息率（中证全史）/ 国债 30Y·10Y 曲线"),
+        dvLvBox,
+        cap("股息率 − 国债 利差（bp）—— 虚线 200bp 经验参考线（非硬阈值）"),
+        dvSpBox,
+        DV.note ? h("div", {style: Object.assign({marginTop: "8px"}, noteStyle)}, [DV.note]) : null,
+      ] : h("div", {class: "empty"}, ["红利股息率待接入（python scripts/update.py --only value）"]),
+    ]);
+
+    /* —— ⑥ 贷款 vs 国债收益率（银行比价·EVA 口径）：置于保险卡与贷款卡之间 ——
+       上：一般贷款利率(季度全史 2009 起) / 调整后贷款收益率(EVA 扣减后) / 国债10Y
+       三线 % 各按自身 dates；下：名义利差与 EVA利差 bp + 0 贷债平衡虚线（markLine
+       挂 series[0]，charts.js 封装） */
+    const LE = V.loanEva || {};
+    const leGet = (k) => (LE[k] && Array.isArray(LE[k].dates) && LE[k].dates.length && has(LE[k].values))
+      ? {name: k, dates: LE[k].dates, values: LE[k].values, src: LE[k]} : null;
+    const leLoan = leGet("一般贷款利率"), leAdj = leGet("调整后贷款收益率"), leY10 = leGet("国债10Y"),
+          leNom = leGet("名义利差"), leEva = leGet("EVA利差");
+    const leLevel = [leLoan, leAdj, leY10].filter(Boolean);   // 同单位 % 共轴
+    const leSpread = [leNom, leEva].filter(Boolean);          // 同单位 bp 共轴
+    const leAny = leLevel.length || leSpread.length;
+    const leLvBox = h("div", {id: "value-eva-level-chart", class: "chart", style: {height: "260px"}});
+    const leSpBox = h("div", {id: "value-eva-spread-chart", class: "chart", style: {height: "260px"}});
+    const leSub = [];
+    if (leNom) leSub.push("名义利差 当前 " + App.fmt(lastNum(leNom.values), 2) + "bp");
+    if (leEva) leSub.push("EVA利差 当前 " + App.fmt(lastNum(leEva.values), 2) + "bp" + pctTxt(leEva.src));
+    const evaCard = h("section", {class: "card", id: "value-eva-card"}, [
+      h("h3", {class: "card-title"}, ["贷款 vs 国债收益率（银行比价·EVA口径）"]),
+      App.badge("自建存储 · 央行一般贷款利率(货政报告) × 新资本办法参数", fetchedAt),
+      h("p", {class: "card-sub"}, [leAny
+        ? "银行放贷 vs 买债性价比 · 上：一般贷款利率 / 调整后贷款收益率（扣税·资本占用·信用成本）/ 国债10Y"
+          + " · 下：名义利差与 EVA利差 bp（0=贷债平衡线）" + (leSub.length ? " · " + leSub.join(" · ") : "")
+        : "一般贷款利率待接入"]),
+      leAny ? [
+        cap("原值（%）—— 一般贷款利率（季度 2009 起）/ 调整后贷款收益率（EVA）/ 国债 10Y 曲线"),
+        leLvBox,
+        cap("利差（bp）—— 名义利差 vs EVA利差，虚线 0=贷债平衡线（负=扣减后债券占优）"),
+        leSpBox,
+        LE.note ? h("div", {style: Object.assign({marginTop: "8px"}, noteStyle)}, [LE.note]) : null,
+      ] : h("div", {class: "empty"}, ["一般贷款利率待接入（python scripts/update.py --only value）"]),
+    ]);
+
     /* 组装后统一绘制（echarts.init 需容器在文档中取非零宽高）：
-       期限利差全幅，国开-国债+股债性价比两列并排，贷款与租金（跨 2009-2026）全幅 */
+       期限利差全幅，国开-国债+股债性价比两列并排，
+       保险比价/银行EVA比价/贷款与租金（跨 2009-2026）全幅 */
     root.append(Export.btn("value"));
-    root.append(termCard, h("div", {class: "grid grid-2"}, [cdbCard, ebCard]), loanCard);
+    root.append(termCard, h("div", {class: "grid grid-2"}, [cdbCard, ebCard]), dyCard, evaCard, loanCard);
 
     if (tsSeries.length) Charts.line(tsBox, {series: tsSeries, yUnit: "bp", range: "3Y"});
     if (cdbOk) Charts.line(cdbBox, {series: [
@@ -145,5 +218,17 @@ PANELS["value"] = {
       {name: "ERP", dates: EB.dates, values: EB.values}], yUnit: EB.unit || "%", range: "3Y"});
     if (lbLevel.length) Charts.line(lvBox, {series: lbLevel, yUnit: "%", range: "ALL"});
     if (lbSpread.length) Charts.line(spBox, {series: lbSpread, yUnit: "bp", range: "ALL"});
+    if (dvLevel.length) Charts.line(dvLvBox, {series: dvLevel, yUnit: "%", range: "ALL"});
+    if (dvSpread.length) Charts.line(dvSpBox, {series: dvSpread, yUnit: "bp", range: "ALL",
+      markLine: {symbol: "none", silent: true,
+                 label: {formatter: "200bp 参考线", position: "insideEndTop", fontSize: 10, color: "#999"},
+                 lineStyle: {type: "dashed", width: 1, color: "#999"},
+                 data: [{yAxis: 200}]}});
+    if (leLevel.length) Charts.line(leLvBox, {series: leLevel, yUnit: "%", range: "ALL"});
+    if (leSpread.length) Charts.line(leSpBox, {series: leSpread, yUnit: "bp", range: "ALL",
+      markLine: {symbol: "none", silent: true,
+                 label: {formatter: "0 贷债平衡线", position: "insideEndTop", fontSize: 10, color: "#999"},
+                 lineStyle: {type: "dashed", width: 1, color: "#999"},
+                 data: [{yAxis: 0}]}});
   },
 };
