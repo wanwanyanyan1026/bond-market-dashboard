@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>超长债温度计 · 债市跟踪</title>
+<link rel="stylesheet" href="assets/css/terminal.css">
+<style>
+/* thermo30y.html 专属（terminal.css 浅色系上的页面级补充） */
+:root{
+  --v-grid:#e4e9f0; --v-border:#dce4ec; --v-ink2:#44576a; --v-muted:#7b8a9a;
+  --c-rate:#2a78d6; --c-credit:#eb6834; --c-fin:#1baf7a;
+}
+#main-chart{width:100%;height:410px}
+#factor-chart{width:100%;height:200px}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 0 10px}
+.big{font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.2}
+.sub{color:var(--v-muted);font-size:12px;line-height:1.7;margin-top:4px}
+.freshbar{display:flex;align-items:center;gap:8px;font-size:12.5px;margin:0 0 10px;
+  padding:6px 12px;border:1px solid var(--v-border);border-radius:6px;background:#fff}
+.fresh-ok{color:#1baf7a}.fresh-warn{color:#c77d0a}.fresh-err{color:#c24135}
+.fresh-mut{color:var(--v-muted)}
+.scale{display:flex;height:13px;border-radius:4px;overflow:hidden;border:1px solid var(--v-border)}
+.scale>div{flex:1}
+.marker{position:relative;height:14px;color:#c24135;font-size:10px}
+.marker span{position:absolute;top:1px;transform:translateX(-50%)}
+.scale-names{display:flex;font-size:10.5px;color:var(--v-muted)}
+.scale-names span{flex:1;text-align:center}
+.srcbadge{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:10px;
+  font-size:11px;background:#fdf3e2;color:#b06f0a;border:1px solid #ecd9b5;cursor:help}
+.posrow{display:flex;gap:18px;margin-top:6px;font-size:13px;color:var(--v-ink2)}
+.posrow b{font-size:18px;font-variant-numeric:tabular-nums}
+.pbar{height:12px;border-radius:6px;background:#eef2f7;border:1px solid var(--v-border);
+  overflow:hidden;margin:8px 0 2px}
+.pbar>div{height:100%;background:var(--c-rate)}
+.vchip{padding:2px 12px;border:1px solid var(--v-border);border-radius:14px;cursor:pointer;
+  background:#fff;color:var(--v-ink2);user-select:none;font-size:13px}
+.vchip.on{background:var(--v-ink2);color:#fff;border-color:var(--v-ink2)}
+.vfilters{display:flex;gap:6px;align-items:center;margin:0 0 8px;font-size:13px;color:var(--v-ink2)}
+.chartnote{color:var(--v-muted);font-size:12px;margin-top:6px;line-height:1.6}
+.vfoot{margin:6px 0 40px;color:var(--v-muted);font-size:12px;line-height:1.8}
+.perftbl{border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums;margin-top:6px}
+.perftbl th,.perftbl td{padding:3px 14px 3px 0;text-align:right;white-space:nowrap}
+.perftbl th{color:var(--v-muted);font-weight:600}
+.perftbl td.l,.perftbl th.l{text-align:left}
+#hist-empty{color:var(--v-muted);font-size:13px;padding:30px 0;text-align:center}
+details summary{cursor:pointer;color:var(--v-ink2);font-size:13.5px}
+/* 移动端断点（配方同 cb.html 09-17c：terminal.css 全站无窄屏适配，页面级内联） */
+@media (max-width: 860px) {
+  .sidebar { position: static; width: auto; }
+  .main { margin-left: 0; padding: 14px 12px 40px; }
+  .cards { grid-template-columns: 1fr; }
+  .cards > .card { min-width: 0; }       /* 1fr 隐含 minmax(auto,1fr)，min-content 会撑破视口 */
+  .panel-h .chip { white-space: normal; } /* #meta-line 长文本 nowrap 撑破视口（terminal.css:256） */
+}
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="brand">超长债温度计<small>30Y国债交易情绪 · 三因子Z(252)合成 · 五区间择时</small></div>
+  <nav class="nav">
+    <button class="menu-link active"><i class="menu-ico">🌡️</i>综合视图</button>
+    <a class="menu-link" href="index.html"><i class="menu-ico">←</i>返回主站</a>
+  </nav>
+  <div class="sidebar-foot" id="side-foot">数据更新于 —</div>
+</aside>
+
+<main class="main">
+
+<section id="view-main">
+  <h2 class="panel-h">30Y国债交易情绪温度计 <span id="meta-line" class="chip" style="margin-left:8px"></span></h2>
+
+  <div class="freshbar" id="fresh"></div>
+
+  <div class="cards">
+    <div class="card">
+      <div class="card-title">① 当前温度</div>
+      <div class="big" id="t-big">—</div>
+      <div class="scale-row" style="margin:10px 0 2px">
+        <div class="scale">
+          <div style="background:#d6e4ff"></div><div style="background:#eef2ff"></div>
+          <div style="background:#f5f5f5"></div><div style="background:#fff2e8"></div>
+          <div style="background:#ffe3cc"></div>
+        </div>
+        <div class="marker"><span id="t-mark">▲</span></div>
+        <div class="scale-names"><span>冰点</span><span>观望</span><span>温和</span><span>积极</span><span>强劲</span></div>
+      </div>
+      <div class="sub" id="t-sub"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">② 仓位信号 <span class="card-sub">当日收盘信号 · 次日生效</span></div>
+      <div class="big" id="p-big">—</div>
+      <div class="posrow"><span>今日已生效 <b id="p-today">—</b></span><span id="p-streak"></span></div>
+      <div class="sub" id="p-sub"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">③ 温度近1年分位</div>
+      <div class="big" id="q-big">—</div>
+      <div class="pbar"><div id="q-bar" style="width:0%"></div></div>
+      <div class="sub" id="q-sub"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">④ 温度计走势 <span class="card-sub">三因子Z合成 · 五区间背景带 · 下轴=当日信号仓位</span></div>
+    <div class="vfilters">显示区间：
+      <span class="vchip" data-r="250">1Y</span><span class="vchip on" data-r="750">3Y</span><span class="vchip" data-r="0">全部</span>
+    </div>
+    <div id="main-chart"></div>
+    <div id="hist-empty" style="display:none"></div>
+    <div class="chartnote">区间带：冰点&lt;-0.5 / 观望 -0.5~-0.25 / 温和 ±0.25 / 积极 0.25~0.5 / 强劲&gt;0.5（虚线=±0.25择时阈值与0轴）。
+      仓位规则：信号&gt;+0.25满仓 / &lt;-0.25空仓 / 带内0.7，当日收盘信号次日生效。</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">⑤ 三因子拆解 <span class="card-sub" id="f-conswk"></span></div>
+    <div id="factor-chart"></div>
+    <div class="chartnote">0中心发散条：z&gt;0 暖色 / z&lt;0 冷色。换手率MA30、拥挤度_1为<b>负向</b>因子（z越高→情绪越冷），
+      机构共识度10MA为<b>正向</b>因子；各自Z(252)标准化后等权合成温度计。共识度为周度数据、滞后一周生效属正常。</div>
+  </div>
+
+  <div class="card">
+    <details>
+      <summary>⑥ 择时绩效参考（净价口径 · 全样本与样本外并列 · 仅参考）</summary>
+      <div id="perf"></div>
+      <div class="chartnote">净价口径=自建20-30Y发行额加权净价指数（纯资本利得），非持有总回报；
+        基准=单边做多。样本外为动态窗口，随每日重算更新。</div>
+    </details>
+  </div>
+
+  <div class="vfoot" id="foot"></div>
+</section>
+
+</main>
+
+<script src="assets/js/echarts.min.js"></script>
+<script>
+"use strict";
+/* 数据加载：日期键自动防陈旧（data.js 每日重写，缓存键每日轮换） */
+function boot(){
+const S = DATA.thermo30y;
+if(!S || !S.record){
+  document.getElementById("side-foot").textContent = "thermo30y 段为空（跟踪包未运行/构建降级）";
+  return;
+}
+const R = S.record, G = R.signal, P = R.position, H = R.history || {dates:[]};
+const INK="#44576a", MUT="#7b8a9a", GRID="#e4e9f0", AXIS="#b9c4cf";
+const WARM="#eb6834", COOL="#2a78d6";
+function fmt(v,d){return (v==null||isNaN(v))?"—":(v>0?"+":"")+v.toFixed(d);}
+
+/* ---------- 头部 / 侧栏 / 新鲜度 ---------- */
+document.getElementById("side-foot").textContent = "数据更新于 " + (R.asOf||"—");
+document.getElementById("meta-line").textContent =
+  "数据截止 "+(R.asOf||"—")+" · 快照生成 "+(R.generatedAt||"—")+" · dc30y跟踪包";
+(function freshness(){
+  const el = document.getElementById("fresh");
+  const rs = R.runStatus, lag = R.dataLag;
+  if(rs && !rs.ok){                                  // 任务挂=红（区别于数据晚=黄）
+    el.innerHTML = '<span class="fresh-err">✕ 跟踪任务异常：'+(rs.error||"未知错误")+
+      '</span><span class="fresh-mut">（'+(rs.ts||"—")+'；以下为上次成功快照）</span>';
+    return;
+  }
+  if(lag==null){ el.innerHTML='<span class="fresh-mut">• 数据新鲜度未知（asOf 缺失）</span>'; return; }
+  if(lag<=1) el.innerHTML='<span class="fresh-ok">✓ 数据新鲜</span>'+
+    '<span class="fresh-mut">asOf 距 '+lag+' 个工作日</span>';
+  else if(lag===2) el.innerHTML='<span class="fresh-warn">⚠ 数据偏晚</span>'+
+    '<span class="fresh-mut">asOf 距 '+lag+' 个工作日（任务上次成功 '+(rs?rs.ts.split("T")[0]:"—")+'）</span>';
+  else el.innerHTML='<span class="fresh-err">⚠ 数据滞后 '+lag+' 个工作日</span>'+
+    '<span class="fresh-mut">（检查计划任务/数据源；以下为上次成功快照）</span>';
+})();
+
+/* ---------- 卡① 温度 ---------- */
+(function cardTemp(){
+  const v = G.thermo3;
+  document.getElementById("t-big").textContent = fmt(v,3);
+  const mk = document.getElementById("t-mark");
+  mk.style.left = (v==null?50:Math.max(0,Math.min(100,(v+3)/6*100)))+"%";
+  document.getElementById("t-sub").innerHTML =
+    "区间 <b>"+(G.zone||"—")+"</b>（三因子等权合成）"+
+    "<br>三因子 z：换手 "+fmt(G.zTurnover,2)+" / 拥挤 "+fmt(G.zCrowding,2)+
+    " / 共识 "+fmt(G.zConsensus,2);
+})();
+
+/* ---------- 卡② 仓位（连续N日=工作日近似） ---------- */
+function busdayCount(fromIso,toIso){          // (from, to] 内的工作日数
+  const d0=new Date(fromIso+"T00:00:00"), d1=new Date(toIso+"T00:00:00");
+  if(isNaN(d0)||isNaN(d1)||d1<=d0) return 0;
+  let n=0; const d=new Date(d0.getTime());
+  while(d<d1){ d.setDate(d.getDate()+1); const w=d.getDay(); if(w>0&&w<6) n++; }
+  return n;
+}
+(function cardPos(){
+  const pctf = v => (v==null||isNaN(v))?"—":(v*100).toFixed(0)+"%";
+  document.getElementById("p-big").textContent = "明日仓位 " + pctf(P.tomorrow);
+  document.getElementById("p-today").textContent = pctf(P.today);
+  const evs = (R.events||[]).slice().sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+  const last = evs[evs.length-1];
+  if(last && R.asOf){
+    const n = busdayCount(last.date, R.asOf);
+    const nm = last.pos>=1?"满仓":(last.pos>0?"带内0.7":"空仓");
+    document.getElementById("p-streak").innerHTML =
+      '<span class="srcbadge" style="background:#eef4fd;color:#2a66a8;border-color:#d6e4ff" title="自 '+
+      last.date+' 切换起按工作日近似">'+nm+'第 '+n+' 个交易日</span>';
+  }
+  document.getElementById("p-sub").textContent = P.rule || "";
+})();
+
+/* ---------- 卡③ 近1年分位 ---------- */
+(function cardPct(){
+  const p = G.pct1y;
+  document.getElementById("q-big").textContent = (p==null||isNaN(p))?"—":(p*100).toFixed(0)+"%";
+  document.getElementById("q-bar").style.width = (p==null?0:Math.round(p*100))+"%";
+  document.getElementById("q-sub").textContent =
+    "当前读数低于近1年 "+(p==null?"—":Math.round((1-p)*100))+"% 的交易日（分位越高越热）";
+})();
+
+/* ---------- ④ 主图（区间带 + 仓位条，联动 x 轴） ---------- */
+const BANDS = [[-99,-0.5,"#d6e4ff"],[-0.5,-0.25,"#eef2ff"],[-0.25,0.25,"#f5f5f5"],
+               [0.25,0.5,"#fff2e8"],[0.5,99,"#ffe3cc"]];
+let curR = 750, mainChart = null;
+function renderMain(){
+  const n = H.dates.length;
+  if(!n){
+    document.getElementById("main-chart").style.display="none";
+    const e=document.getElementById("hist-empty");
+    e.style.display="block";
+    e.textContent="全量序列待跟踪包下次运行生成（thermo3_full.csv；当前快照无历史行）";
+    return;
+  }
+  const lo = curR>0 ? Math.max(0,n-curR) : 0;
+  const xs = H.dates.slice(lo), tv = H.thermo3.slice(lo), pv = H.pos.slice(lo);
+  if(!mainChart) mainChart = echarts.init(document.getElementById("main-chart"));
+  mainChart.setOption({
+    backgroundColor:"#ffffff",
+    grid:[{left:56,right:24,top:26,height:290},
+          {left:56,right:24,top:336,height:56}],
+    tooltip:{trigger:"axis",formatter:function(ps){
+      if(!ps||!ps.length) return "";
+      const i=ps[0].dataIndex;
+      return "<b>"+xs[i]+"</b><br>温度计："+fmt(tv[i],3)+"（"+(H.zone[i]||"—")+"）"+
+        "<br>换手z："+fmt(H.z_turnover[i],2)+" / 拥挤z："+fmt(H.z_crowding[i],2)+
+        " / 共识z："+fmt(H.z_consensus[i],2)+
+        "<br>当日信号仓位："+((pv[i]==null)?"—":(pv[i]*100).toFixed(0)+"%");
+    }},
+    axisPointer:{link:[{xAxisIndex:"all"}]},
+    xAxis:[{type:"category",gridIndex:0,data:xs,axisLabel:{show:false},
+             axisLine:{lineStyle:{color:AXIS}},axisTick:{show:false}},
+           {type:"category",gridIndex:1,data:xs,axisLabel:{color:MUT},
+             axisLine:{lineStyle:{color:AXIS}},axisTick:{show:false}}],
+    yAxis:[{gridIndex:0,min:-3,max:3,name:"温度",scale:false,
+             splitLine:{lineStyle:{color:GRID}},axisLabel:{color:MUT},
+             nameTextStyle:{color:MUT}},
+           {gridIndex:1,min:0,max:1,show:false}],
+    series:[
+      {name:"温度计",type:"line",data:tv,xAxisIndex:0,yAxisIndex:0,
+       itemStyle:{color:INK},lineStyle:{color:INK,width:1.6},symbol:"none",
+       markArea:{silent:true,label:{show:false},
+         data:BANDS.map(b=>[{yAxis:Math.max(b[0],-3),itemStyle:{color:b[2]}},
+                            {yAxis:Math.min(b[1],3)}])},
+       markLine:{symbol:"none",silent:true,label:{show:false},
+         lineStyle:{color:AXIS,type:"dashed"},
+         data:[{yAxis:0.25},{yAxis:-0.25},{yAxis:0}]}},
+      {name:"当期",type:"scatter",data:[[xs[n-1-lo],tv[n-1-lo]]],
+       xAxisIndex:0,yAxisIndex:0,symbolSize:8,itemStyle:{color:"#c24135"},
+       label:{show:true,formatter:fmt(tv[n-1-lo],3),position:"top",
+         color:"#c24135",fontWeight:600}},
+      {name:"信号仓位",type:"bar",data:pv,xAxisIndex:1,yAxisIndex:1,
+       barWidth:"58%",itemStyle:{color:"rgba(42,120,214,.35)"}},
+    ],
+  },true);
+}
+document.querySelectorAll(".vfilters .vchip[data-r]").forEach(ch=>
+  ch.addEventListener("click",()=>{
+    document.querySelectorAll(".vfilters .vchip[data-r]").forEach(c=>c.classList.remove("on"));
+    ch.classList.add("on"); curR=+ch.dataset.r; renderMain();
+  }));
+renderMain();
+
+/* ---------- ⑤ 三因子发散条 ---------- */
+(function renderFactors(){
+  const el = document.getElementById("factor-chart");
+  const rows=[["机构共识度10MA（正向）",G.zConsensus],
+              ["拥挤度_1 MA30（负向）",G.zCrowding],
+              ["换手率MA30（负向）",G.zTurnover]];
+  const fc = echarts.init(el);
+  fc.setOption({
+    backgroundColor:"#ffffff",
+    grid:{left:170,right:60,top:14,bottom:26},
+    tooltip:{trigger:"item",formatter:p=>"<b>"+p.name+"</b><br>z = "+
+      fmt(rows[p.dataIndex][1],3)+"（|z|钳位显示，悬浮为真值）"},
+    xAxis:{type:"value",min:-3,max:3,
+      splitLine:{lineStyle:{color:GRID}},axisLine:{show:false},axisLabel:{color:MUT}},
+    yAxis:{type:"category",data:rows.map(r=>r[0]),
+      axisLine:{lineStyle:{color:AXIS}},axisTick:{show:false},
+      axisLabel:{color:INK,fontSize:12.5}},
+    series:[{type:"bar",barWidth:"52%",
+      data:rows.map(r=>({value:Math.max(-3,Math.min(3,r[1]==null?0:r[1])),
+        label:{show:r[1]!=null,formatter:fmt(r[1],2),
+          position:r[1]>=0?"right":"left",color:INK},
+        itemStyle:{color:(r[1]==null?MUT:(r[1]>=0?WARM:COOL))}})),
+      markLine:{symbol:"none",silent:true,label:{show:false},
+        lineStyle:{color:AXIS,type:"dashed"},data:[{xAxis:0}]}}],
+  },true);
+  window._fc = fc;
+  document.getElementById("f-conswk").textContent =
+    R.consensusWeek ? "共识度截至 "+R.consensusWeek+"（周度滞后属正常）" : "";
+})();
+
+/* ---------- ⑥ 绩效参考（全样本+样本外并列） ---------- */
+(function renderPerf(){
+  const pf = R.perfRef;
+  if(!pf){ document.getElementById("perf").textContent="—"; return; }
+  const cell = m => (m==null)?"—":(m.ann!=null?m.ann.toFixed(2):"—");
+  const row = (nm,m,cls) =>
+    '<tr><td class="l">'+nm+'</td><td>'+cell(m)+'</td><td>'+
+    (m&&m.vol!=null?m.vol.toFixed(2):"—")+'</td><td>'+
+    (m&&m.sharpe!=null?m.sharpe.toFixed(2):"—")+'</td><td>'+
+    (m&&m.mdd!=null?m.mdd.toFixed(2):"—")+'</td><td>'+
+    (m&&m.days!=null?m.days:"—")+'</td></tr>';
+  document.getElementById("perf").innerHTML =
+    '<div class="chartnote">回测窗口 '+(pf.window?pf.window[0]+" ~ "+pf.window[1]:"—")+'</div>'+
+    '<table class="perftbl"><thead><tr><th class="l">口径</th><th>年化%</th><th>波动%</th>'+
+    '<th>Sharpe</th><th>最大回撤%</th><th>交易日</th></tr></thead><tbody>'+
+    row("策略 · 全样本",pf.strat_full)+row("策略 · 样本外",pf.strat_oos)+
+    row("基准 · 全样本",pf.bench_full)+row("基准 · 样本外",pf.bench_oos)+
+    "</tbody></table>";
+})();
+
+/* ---------- 脚注（caveats 随行） ---------- */
+document.getElementById("foot").innerHTML =
+  "口径与限制："+(R.caveats||[]).map((c,i)=>(i+1)+"）"+c).join("；")+"。<br>"+
+  "数据链路：dc30y跟踪包（计划任务 工作日18:30 全量重算）→ output/track → "+
+  "storage/thermo30y.json → 本页；fetch 失败保留上次快照，新鲜度黄/红提示随之推进。"+
+  "因子/温度计/择时逻辑冻结于源复现仓库，本页零改动。";
+
+window.addEventListener("resize",()=>{ if(mainChart) mainChart.resize();
+  if(window._fc) window._fc.resize(); });
+}
+(function () {
+  var v = "thermo30y-" + new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  var s = document.createElement("script");
+  s.src = "assets/data/data.js?v=" + v;
+  s.onload = function () {
+    if (typeof DATA !== "undefined" && DATA.thermo30y) boot();
+    else document.getElementById("side-foot").textContent = "data.js 缺 thermo30y 段";
+  };
+  s.onerror = function () { document.getElementById("side-foot").textContent = "data.js 加载失败"; };
+  document.head.appendChild(s);
+})();
+</script>
+</body>
+</html>

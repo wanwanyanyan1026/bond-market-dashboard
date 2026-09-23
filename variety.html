@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>相对价值 · 债市跟踪</title>
+<link rel="stylesheet" href="assets/css/terminal.css">
+<style>
+/* variety.html 专属：矩阵洗色/信号点/冻结列/下钻筛选（terminal.css 浅色系上的页面级补充） */
+:root{
+  --v-grid:#e4e9f0; --v-border:#dce4ec; --v-ink2:#44576a; --v-muted:#7b8a9a;
+  --c-rate:#2a78d6; --c-credit:#eb6834; --c-fin:#1baf7a;
+}
+#quadrant{width:100%;height:430px}
+#boll{width:100%;height:580px}
+.vfilters{display:flex;gap:6px;align-items:center;margin:0 0 8px;font-size:13px;color:var(--v-ink2)}
+.vchip{padding:2px 12px;border:1px solid var(--v-border);border-radius:14px;cursor:pointer;
+  background:#fff;color:var(--v-ink2);user-select:none}
+.vchip.on{background:var(--v-ink2);color:#fff;border-color:var(--v-ink2)}
+.tblwrap{overflow:auto;max-height:780px;border:1px solid var(--v-grid);border-radius:6px}
+.tblwrap table{border-collapse:collapse;width:100%;font-size:12px;font-variant-numeric:tabular-nums}
+.tblwrap th,.tblwrap td{padding:3px 8px;text-align:right;white-space:nowrap;
+  border-bottom:1px solid var(--v-grid)}
+.tblwrap th{color:var(--v-muted);font-weight:600;position:sticky;background:#fff;z-index:2}
+.tblwrap thead tr:first-child th{top:0}
+.tblwrap thead tr:nth-child(2) th{top:25px}   /* 首行高≈24-25px: 12px×1.5+2×3px+1px边, 改字号须同步 */
+.tblwrap td.l,.tblwrap th.l{text-align:left}
+.sticky-col{position:sticky;left:0;background:#fff;z-index:1}
+.tblwrap thead .sticky-col{z-index:3}         /* 角格>表头>冻结列>表体, 横向滚动时不被表头盖住 */
+.tblwrap tbody tr{cursor:pointer}
+.tblwrap td{background:var(--w,transparent)}  /* 洗色经--w注入 */
+.tblwrap tbody tr:hover td{background:#f2f7fd}
+.tblwrap td.dim{color:var(--v-muted)}
+#concl .hd{font-size:14px;font-weight:600}
+#concl ul{margin:6px 0;padding-left:20px}
+#concl li{margin:3px 0}
+#concl .note{color:var(--v-muted);font-size:12px;margin-top:6px}
+.sigdot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.legendwash{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--v-ink2);margin:0 0 8px}
+.legendwash .bar{width:180px;height:10px;border-radius:5px;border:1px solid var(--v-border)}
+.filters2{display:flex;gap:14px;margin:0 0 8px;font-size:13px;color:var(--v-ink2);align-items:center;flex-wrap:wrap}
+#dd-title{color:var(--c-rate);font-weight:600;margin-left:6px}
+#dd-pick{font:inherit;font-size:13px;color:var(--v-ink2);background:#fff;
+  border:1px solid var(--v-border);border-radius:6px;padding:2px 6px;max-width:250px}
+.chartnote{color:var(--v-muted);font-size:12px;margin-top:6px;line-height:1.6}
+.vfoot{margin:6px 0 40px;color:var(--v-muted);font-size:12px;line-height:1.8}
+/* 移动端断点（配方同 cb.html 09-17c：terminal.css 全站无窄屏适配，页面级内联；
+   .grid 规则兼护总览视图 #ov-root 里 value.js 渲染的 grid-2） */
+@media (max-width: 1100px) { .grid-2 { grid-template-columns: 1fr; } }
+@media (max-width: 860px) {
+  .sidebar { position: static; width: auto; }
+  .main { margin-left: 0; padding: 14px 12px 40px; }
+  .badge { position: static; display: block; margin: 0 0 6px; white-space: normal; }
+  .card-title { padding-right: 0; }
+  .grid > .card { min-width: 0; }        /* 1fr 隐含 minmax(auto,1fr)，min-content 会撑破视口 */
+  .vfilters { flex-wrap: wrap; }
+  .panel-h .chip { white-space: normal; } /* #meta-line 长文本 nowrap 撑破视口（terminal.css:256） */
+}
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="brand">相对价值<small>期限利差 · 隐含税率 · ERP · 品种性价比</small></div>
+  <nav class="nav">
+    <button class="menu-link" id="btn-overview"><i class="menu-ico">⚖️</i>总览</button>
+    <button class="menu-link active" id="btn-variety"><i class="menu-ico">🎯</i>品种性价比</button>
+    <a class="menu-link" href="index.html"><i class="menu-ico">←</i>返回主站</a>
+  </nav>
+  <div class="sidebar-foot" id="side-foot">数据更新于 —</div>
+</aside>
+
+<main class="main">
+
+<!-- 页1 总览：复用主站 assets/js/panels/value.js 渲染（PANELS.value.render，见页尾脚本） -->
+<section id="view-overview" hidden>
+  <h2 class="panel-h">相对价值 · 总览</h2>
+  <div id="ov-root"></div>
+</section>
+
+<section id="view-main">
+  <h2 class="panel-h">品种相对性价比 <span id="meta-line" class="chip" style="margin-left:8px"></span></h2>
+
+  <div class="card">
+    <div class="badge">规则自动生成 · 3Y分位 × 近3M久期调整动量 · 随每日构建刷新</div>
+    <div class="card-title">⭐ 策略结论</div>
+    <div id="concl"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">① 多窗口分位 × 布林矩阵 <span class="card-sub">点击行 → 下钻布林带</span></div>
+    <div class="vfilters">大类筛选：
+      <span class="vchip on" data-cat="全部">全部</span>
+      <span class="vchip" data-cat="利率债">利率债</span>
+      <span class="vchip" data-cat="信用债">信用债</span>
+      <span class="vchip" data-cat="金融债">金融债</span>
+    </div>
+    <div class="legendwash">贵/超涨
+      <span class="bar" id="washbar"></span>
+      便宜/滞后　·　格=利差在窗内历史分位%（左4组）与 z 值（右4组）；末两列=带宽挤压、基金动向</div>
+    <div class="tblwrap"><table id="matrix"></table></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">② 估值分位 × 超额动量 四象限</div>
+    <div class="card-sub">x=3Y利差分位，y=近3M久期调整利差收益；空心点=真值超轴域（钉边，悬浮见真值）；点击点下钻</div>
+    <div id="quadrant"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">③ 布林带下钻 <span id="dd-title">（先点上方任一行 / 四象限任一点）</span></div>
+    <div class="filters2">
+      <span>带宽窗口：</span>
+      <span class="vchip" data-w="250">1Y</span><span class="vchip on" data-w="750">3Y</span><span class="vchip" data-w="1250">5Y</span>
+      <span>显示区间：</span>
+      <span class="vchip on" data-r="750">3Y</span><span class="vchip" data-r="0">全部</span>
+      <span>下钻品种：</span><select id="dd-pick"></select>
+    </div>
+    <div id="boll"></div>
+    <div class="chartnote">%B =（利差−中轨）/（2σ）+ 0.5：利差在带内的相对位置——0=贴下轨、0.5=中轨、1=贴上轨，&lt;0 或 &gt;1=带外（&gt;1 利差偏贵、&lt;0 偏便宜）。带宽% = 4σ/中轨：带的相对宽度——收窄=波动挤压（对应矩阵“带宽分位”列），挤压后易出现方向性突破。</div>
+  </div>
+
+  <div class="vfoot" id="foot"></div>
+</section>
+
+</main>
+
+<script src="assets/js/echarts.min.js"></script>
+<!-- 总览页复用主站既有脚本（零新建 .js）：charts.js 声明 PANELS 须先于 value.js 加载 -->
+<script src="assets/js/charts.js"></script>
+<script src="assets/js/vendor/xlsx.min.js"></script>
+<script src="assets/js/export.js"></script>
+<script src="assets/js/panels/value.js"></script>
+<script>
+"use strict";
+/* app.js 子集 shim：总览页复用 charts.js/value.js/export.js 所需
+   （函数体与 app.js 保持一致——改 app.js 的 h / App.fmt / App.badge 时须同步此处） */
+function h(tag, attrs, children) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v === null || v === undefined || v === false) continue;
+    if (k.startsWith("on") && typeof v === "function") {
+      el.addEventListener(k.slice(2).toLowerCase(), v);
+    } else if (k === "class") {
+      el.className = v;
+    } else if (k === "style" && typeof v === "object") {
+      Object.assign(el.style, v);
+    } else {
+      el.setAttribute(k, v);
+    }
+  }
+  const kids = (Array.isArray(children) ? children : (children === undefined ? [] : [children])).flat(Infinity);
+  for (const c of kids) {
+    if (c === null || c === undefined || c === false || c === true) continue;
+    el.append(c instanceof Node ? c : document.createTextNode(String(c)));
+  }
+  return el;
+}
+var App = {
+  fmt(v, digits) {
+    if (v === null || v === undefined || v === "") return "—";
+    const n = Number(v);
+    if (Number.isNaN(n)) return "—";
+    return n.toLocaleString("en-US", {
+      minimumFractionDigits: digits === undefined ? 2 : digits,
+      maximumFractionDigits: digits === undefined ? 2 : digits,
+    });
+  },
+  badge(src, time) {
+    const t = time ? String(time).replace("T", " ").slice(0, 16) : "";
+    return h("span", {class: "badge"}, [[src, t].filter(Boolean).join(" · ")]);
+  },
+};
+
+/* ============ 两页切换：⚖️总览（主站 value 面板渲染）/ 🎯品种性价比 ============ */
+function showPage(p) {
+  document.getElementById("view-overview").hidden = p !== "overview";
+  document.getElementById("view-main").hidden = p !== "variety";
+  document.getElementById("btn-overview").classList.toggle("active", p === "overview");
+  document.getElementById("btn-variety").classList.toggle("active", p === "variety");
+  history.replaceState(null, "", "#" + p);
+  const foot = document.getElementById("side-foot");
+  if (p === "overview") {
+    const r = document.getElementById("ov-root");
+    r.innerHTML = "";
+    if (typeof PANELS !== "undefined" && PANELS.value && typeof Export !== "undefined"
+        && typeof DATA !== "undefined" && DATA.value) {
+      PANELS.value.render(r);   // App.show 同款清空后渲染；每次激活重渲，规避 hidden 期 echarts 0 尺寸
+      const m = (DATA.meta && DATA.meta.modules && DATA.meta.modules.value) || {};
+      if (m.asOf) foot.textContent = "数据更新于 " + m.asOf;
+    } else {
+      r.innerHTML = '<div class="empty">value 段未就绪（构建降级/数据未加载）</div>';
+    }
+  } else {
+    /* 品种性价比可能在 hidden 期由 boot() 渲染（#overview 直达场景）→ 激活时统一 resize（q/boll 页内监听） */
+    window.dispatchEvent(new Event("resize"));
+    if (typeof DATA !== "undefined" && DATA.variety && DATA.variety.meta && DATA.variety.meta.asOf)
+      foot.textContent = "数据更新于 " + DATA.variety.meta.asOf;
+  }
+}
+document.getElementById("btn-overview").addEventListener("click", function () { showPage("overview"); });
+document.getElementById("btn-variety").addEventListener("click", function () { showPage("variety"); });
+showPage(location.hash === "#overview" ? "overview" : "variety");
+
+/* 数据加载：日期键自动防陈旧（data.js 每日重写，缓存键每日轮换） */
+function boot(){
+const D = DATA.variety;
+if(!D || !D.rows || !D.rows.length){
+  document.getElementById("side-foot").textContent = "variety 段为空（构建降级/数据未就绪）";
+  return;
+}
+const CAT_COLOR = {"利率债": "#2a78d6", "信用债": "#eb6834", "金融债": "#1baf7a"};
+const POLE_RICH = "#c24135", POLE_CHEAP = "#16865c", MID = "#f4f8fb";   // terminal 浅色系极值
+const WINS = ["1Y", "3Y", "5Y", "全部"];
+let curCat = "全部", curKey = null, curW = 750, curR = 750;
+
+/* ---------- utils ---------- */
+function hex2rgb(h){h=h.replace("#","");return [0,2,4].map(i=>parseInt(h.slice(i,i+2),16));}
+function mix(a,b,t){const A=hex2rgb(a),B=hex2rgb(b);
+  return "rgb("+A.map((v,i)=>Math.round(v+(B[i]-v)*t)).join(",")+")";}
+function wash(norm){                     // norm∈[-1,1]: <0 贵(红) / >0 便宜(绿)
+  if(norm==null||isNaN(norm)) return "transparent";
+  const t = Math.min(Math.abs(norm),1)*0.72;
+  return mix(MID, norm<0?POLE_RICH:POLE_CHEAP, t);
+}
+function fmt(v,d){return (v==null||isNaN(v))?"—":v.toFixed(d);}
+function fmtFund(v){return v==null?"—":(v>0?"+":"")+v.toFixed(0);}
+
+/* ---------- 头部 / 侧栏 / 脚注 ---------- */
+document.getElementById("side-foot").textContent = "数据更新于 " + D.meta.asOf;
+document.getElementById("meta-line").textContent =
+  "数据截止 "+D.meta.asOf+" · 信用利差 = 品种 − 同期限国开（bp）· 分位在各自可得历史内计算";
+document.getElementById("washbar").style.background =
+  "linear-gradient(90deg,"+mix(POLE_RICH,MID,0.25)+","+MID+","+mix(POLE_CHEAP,MID,0.25)+")";
+document.getElementById("foot").innerHTML =
+  "口径与限制：① 信用利差=品种−同期限国开；利率行=国开−国债、国债期限利差。"+
+  "② “全部”窗含 2022-11 赎回潮结构性断点，未剔除、仅提示。"+
+  "③ 久期调整收益 y=−ΔS×D，D 为闭式平价久期 D=(1−(1+y′)^−T)/y′（y′=左腿品种最新曲线收益率；"+
+  "y′ 非正/缺失时回退近似表 "+
+  Object.entries(D.meta.dmod.fallback).map(kv=>kv[0]+"Y:"+kv[1]).join(" / ")+
+  "）。"+
+  "④ 基金1M=近4周(≈21个交易日)基金净买入合计(亿元)，大类口径：信用品种↔基金信用债、国开-国债↔政金债、期限利差↔国债。"+
+  "⑤ 曲线起点： "+D.meta.coverage.map(c=>c.name+" "+c.start).join("；")+"。"+
+  "⑥ 缺档（城投7/10Y、商金AA+非常规期限、证券类）未纳入。"+
+  "⑦ 品种间利差对（二永-商金债=次级/永续期权价值、城投-中票=城投溢价）：AAA- 档 vs 银行普通 AAA 为错档比较（含评级差），AA+ 档同档；城投 AA(2)/AA- 无同档中票未纳入。"+
+  "⑧ carry 三列（仅“品种−国开”信用行；品种间对比行、利率债行无持有含义，显示 —）：月carry=持有该品种一个月大约能赚的票息（按品种收益率×平价久期估算，单位 bp）；保护月数=当前利差÷月carry，即靠票息攒回当前利差要几个月——数字越小，票息相对利差越厚，“便宜但捂着”越扛得住；近月HPR=该品种上一个完整自然月实际拿到手的总收益（含票息与价格变动，单位 bp，例：数据截至 9 月即取 8 月整月），与月carry 对照可分辨“票息已兑现”还是“只是便宜没涨”。部分品种暂无持有收益曲线，该列显示 —。";
+
+/* ================= 策略结论（规则自动生成） ================= */
+const SIG_COLOR={"超涨":"#c24135","左侧确认":"#2a78d6","价值区":"#16865c","双杀":"#7b8a9a"};
+function sigOf(r){                       // 3Y分位<50%=贵; y>0=近3M领涨(利差收窄)
+  if(r.pct["3Y"]==null||r.y==null) return null;
+  return r.pct["3Y"]<50?(r.y>0?"超涨":"双杀"):(r.y>0?"左侧确认":"价值区");
+}
+function med(a){const v=a.filter(x=>x!=null).sort((x,y)=>x-y);
+  return v.length?v[Math.floor(v.length/2)]:null;}
+(function buildConclusion(){
+  const nm=r=>r.name+r.tenor+"Y";
+  const sig=D.rows.map(sigOf), n=sig.filter(Boolean).length;
+  const cnt={};sig.forEach(s=>{if(s)cnt[s]=(cnt[s]||0)+1;});
+  const val=D.rows.filter(r=>sigOf(r)==="价值区").sort((a,b)=>b.pct["3Y"]-a.pct["3Y"]);
+  const rt=D.rows.filter(r=>sigOf(r)==="左侧确认");
+  const lb=D.rows.filter(r=>sigOf(r)==="双杀");
+  const overN=cnt["超涨"]||0;
+  const over10=D.rows.filter(r=>sigOf(r)==="超涨"&&r.pct["3Y"]<10)
+    .sort((a,b)=>a.pct["3Y"]-b.pct["3Y"]);
+  const sq=D.rows.filter(r=>r.bw3y!=null&&r.bw3y<20).length;
+  const fc=D.rows.find(r=>r.key==="mtn_AA+_3"),
+        ff=D.rows.find(r=>r.key==="rate_cdb_1"),
+        fg=D.rows.find(r=>r.key==="rate_gov_30_10");
+  const dom=overN>=n*0.6
+    ?"利差普遍处历史低位、动量仍在收窄（超涨 "+overN+"/"+n+"），整体追涨性价比低——关注左侧品种，防回调"
+    :(val.length+rt.length)>=n*0.4
+    ?"高分位品种占比高（价值区+左侧确认 "+(val.length+rt.length)+"/"+n+"），以价值区机会为主，可逐步左侧布局"
+    :"多空信号分化，按品种区分对待";
+  const catMed=["利率债","信用债","金融债"]
+    .map(c=>c+" "+(med(D.rows.filter(r=>r.cat3===c).map(r=>r.pct["3Y"]))||0).toFixed(0)+"%").join(" · ");
+  document.getElementById("concl").innerHTML=
+    '<div class="hd">'+dom+"</div><ul>"+
+    "<li><b>价值区</b>（便宜+滞后，左侧关注）："+(val.length?val.map(nm).join("、"):"无")+"</li>"+
+    "<li><b>左侧确认</b>（便宜+已领涨）："+(rt.length?rt.map(nm).join("、"):"无")+
+    "　｜　<b>双杀</b>（贵+仍走阔，回避）："+(lb.length?lb.map(nm).join("、"):"无")+"</li>"+
+    "<li><b>超涨集中</b>："+overN+" 只，其中 3Y 分位&lt;10% 有 "+over10.length+" 只"+
+    (over10.length?"（"+over10.slice(0,6).map(nm).join("、")+" 等）":"")+"</li>"+
+    "<li><b>带宽挤压预警</b>（带宽3Y分位&lt;20%）："+sq+" 只，低波动后利差波动可能放大</li>"+
+    "<li><b>基金动向</b>（近4周净买入）：信用 "+fmtFund(fc&&fc.fund1m)+" 亿 / 政金 "+
+    fmtFund(ff&&ff.fund1m)+" 亿 / 国债 "+fmtFund(fg&&fg.fund1m)+" 亿"+
+    ((fc&&fc.fund1m)>0?"——资金仍在增持信用，拥挤度偏高":"")+"</li>"+
+    "</ul>"+
+    '<div class="note">全市场 3Y 分位中位数 '+(med(D.rows.map(r=>r.pct["3Y"]))||0).toFixed(1)+
+    "%（"+catMed+"）。规则：信号 = 3Y利差分位（&lt;50% 记贵）× 近3M久期调整利差收益（&gt;0 记领涨）；自动生成，不构成投资建议。</div>";
+})();
+
+/* ================= 视图① 矩阵表 ================= */
+function buildTable(){
+  const rows = D.rows.filter(r=>curCat==="全部"||r.cat3===curCat);
+  let h = "<thead><tr>"+
+    '<th class="l">板块</th><th class="l sticky-col">品种</th><th>期限</th>'+
+    "<th>最新bp</th><th>Δ3M</th><th>信号</th>"+
+    '<th colspan="4">利差分位%（贵←→便宜）</th><th colspan="4">z-score</th>'+
+    "<th>带宽分位</th><th>基金1M</th><th>月carry</th><th>保护月数</th><th>近月HPR</th></tr><tr>"+
+    '<th class="l"></th><th class="l sticky-col"></th><th>年</th><th></th><th>bp</th><th></th>'+
+    WINS.map(w=>"<th>"+w+"</th>").join("")+WINS.map(w=>"<th>"+w+"</th>").join("")+
+    "<th>%</th><th>亿</th><th>bp</th><th>月</th><th>bp</th></tr></thead><tbody>";
+  for(const r of rows){
+    // Δ3M>0=走阔(滞后→绿), <0=收窄(超涨→红): 与分位列同一条贵↔便宜轴
+    const chgN = r.chg3m==null?null:Math.max(-1,Math.min(1,r.chg3m/30));
+    const s = sigOf(r);
+    h += '<tr data-key="'+r.key+'">'
+      +'<td class="l dim">'+r.group+'</td><td class="l sticky-col">'+r.name+"</td><td>"+r.tenor+"</td>"
+      +"<td>"+fmt(r.last,1)+"</td>"
+      +'<td style="--w:'+wash(chgN)+'">'+fmt(r.chg3m,1)+"</td>"
+      +'<td class="l">'+(s?'<span class="sigdot" style="background:'+SIG_COLOR[s]+'"></span>'+s:'<span class="dim">—</span>')+"</td>"
+      +WINS.map(w=>'<td style="--w:'+wash(r.pct[w]==null?null:(r.pct[w]-50)/50)+'">'+fmt(r.pct[w],0)+"</td>").join("")
+      +WINS.map(w=>'<td style="--w:'+wash(r.z[w]==null?null:r.z[w]/3)+'">'+fmt(r.z[w],1)+"</td>").join("")
+      // 带宽仅低分位上红(挤压预警), 高分位不着绿——带宽是波动信号不是估值
+      +'<td style="--w:'+wash(r.bw3y==null?null:Math.min(0,(r.bw3y-50)/50))+'">'+fmt(r.bw3y,0)+"</td>"
+      +'<td class="dim">'+fmtFund(r.fund1m)+"</td>"
+      +'<td class="dim">'+fmt(r.carry1m,0)+"</td>"
+      +'<td class="dim">'+fmt(r.protM,2)+"</td>"
+      +'<td class="dim">'+fmt(r.hprM,0)+"</td></tr>";
+  }
+  const tb = document.getElementById("matrix");
+  tb.innerHTML = h+"</tbody>";
+  tb.querySelectorAll("tr[data-key]").forEach(tr=>
+    tr.addEventListener("click",()=>drill(tr.dataset.key)));
+}
+document.querySelectorAll(".vfilters .vchip").forEach(ch=>
+  ch.addEventListener("click",()=>{
+    document.querySelectorAll(".vfilters .vchip").forEach(c=>c.classList.remove("on"));
+    ch.classList.add("on"); curCat = ch.dataset.cat; buildTable();
+  }));
+buildTable();
+
+/* ================= 视图② 四象限 ================= */
+const q = echarts.init(document.getElementById("quadrant"));
+function renderQuadrant(){
+  // y轴按|y|的p95定界: 离群点(如城投AA(2)7Y)不再压扁主体, 超界点钉边空心显示
+  const ay = D.rows.filter(r=>r.y!=null).map(r=>Math.abs(r.y)).sort((a,b)=>a-b);
+  const yAbs = Math.max(30, Math.ceil(
+    (ay[Math.min(ay.length-1,Math.floor(ay.length*0.95))]||1)*1.25/10)*10);
+  const PIN = yAbs-3;
+  const cats = ["利率债","信用债","金融债"];
+  q.setOption({
+    backgroundColor:"#ffffff",
+    grid:{left:70,right:30,top:36,bottom:48},
+    legend:{top:4,left:10,itemWidth:14,textStyle:{color:"#44576a"},
+      data:["利率债","信用债","金融债"]},
+    tooltip:{trigger:"item",formatter:p=>{
+      if(!p.data||!p.data.r) return "";
+      const r=p.data.r;
+      return "<b>"+r.name+" "+r.tenor+"Y</b>（"+r.group+"）<br>"+
+        "3Y分位："+fmt(r.pct["3Y"],0)+"%<br>"+
+        "近3M利差变动："+fmt(r.chg3m,1)+"bp<br>"+
+        "久期调整收益："+fmt(r.y,0)+"bp<br>"+
+        "最新利差："+fmt(r.last,1)+"bp<br>"+
+        "基金1M："+fmtFund(r.fund1m)+"亿";}},
+    xAxis:{type:"value",min:0,max:100,name:"3Y 利差分位 % → 便宜",
+      nameLocation:"middle",nameGap:30,nameTextStyle:{color:"#7b8a9a"},
+      splitLine:{lineStyle:{color:"#e4e9f0"}},axisLine:{show:false},
+      axisLabel:{color:"#7b8a9a"}},
+    yAxis:{type:"value",min:-yAbs,max:yAbs,name:"近3M久期调整收益 bp",
+      nameLocation:"middle",nameGap:44,nameRotate:90,
+      nameTextStyle:{color:"#7b8a9a"},
+      splitLine:{lineStyle:{color:"#e4e9f0"}},axisLine:{show:false},
+      axisLabel:{color:"#7b8a9a"}},
+    series:cats.map(c=>({
+      name:c,type:"scatter",symbolSize:9,
+      itemStyle:{color:CAT_COLOR[c],opacity:.85},
+      data:D.rows.filter(r=>r.cat3===c&&r.y!=null&&r.pct["3Y"]!=null)
+        .map(r=>Math.abs(r.y)>PIN
+          ?{value:[r.pct["3Y"],Math.sign(r.y)*PIN],r,
+            itemStyle:{color:"#ffffff",borderColor:CAT_COLOR[c],borderWidth:2,opacity:1}}
+          :{value:[r.pct["3Y"],r.y],r}),
+    })).concat([{                 // 十字中线专用隐形载体: 不随图例显隐
+      name:"_mid",type:"scatter",data:[],silent:true,itemStyle:{opacity:0},
+      markLine:{symbol:"none",silent:true,label:{show:false},
+        lineStyle:{color:"#b9c4cf",type:"dashed"},
+        data:[{xAxis:50},{yAxis:0}]}}]),
+    graphic:[                     // 左=贵(低分位) 右=便宜(高分位) 上=领涨 下=滞后
+      {type:"text",left:84,top:56,style:{text:"贵+领涨（超涨）",fill:"#7b8a9a",fontSize:12}},
+      {type:"text",right:46,top:56,style:{text:"便宜+领涨（左侧确认）",fill:"#7b8a9a",fontSize:12}},
+      {type:"text",right:46,bottom:60,style:{text:"便宜+滞后（价值区）",fill:"#7b8a9a",fontSize:12}},
+      {type:"text",left:84,bottom:60,style:{text:"贵+滞后（双杀）",fill:"#7b8a9a",fontSize:12}},
+    ],
+  },true);
+}
+renderQuadrant();
+q.on("click",p=>{ if(p.data&&p.data.r) drill(p.data.r.key); });
+
+/* ================= 视图③ 布林带下钻 ================= */
+const boll = echarts.init(document.getElementById("boll"));
+
+function rollStats(arr,W){                 // 前缀和滚动均值/标准差, O(n)
+  const n=arr.length, mean=new Array(n).fill(null), sd=new Array(n).fill(null);
+  W=Math.min(W,n);
+  let ps=0,ps2=0;
+  for(let i=0;i<n;i++){
+    const x=arr[i]; ps+=x; ps2+=x*x;
+    if(i>=W){const y=arr[i-W]; ps-=y; ps2-=y*y;}
+    if(i>=W-1){const m=ps/W, v=ps2/W-m*m; mean[i]=m; sd[i]=Math.sqrt(Math.max(v,0));}
+  }
+  return {mean,sd};
+}
+
+function drill(key){
+  curKey=key;
+  const r=D.rows.find(x=>x.key===key);
+  document.getElementById("dd-title").textContent=
+    "—— "+r.name+" "+r.tenor+"Y（"+r.group+"）";
+  const sel=document.getElementById("dd-pick");
+  if(sel&&sel.value!==key) sel.value=key;   // 下拉与点行/点四象限双向同步
+  renderBoll();
+}
+
+function renderBoll(){
+  if(!curKey) return;
+  const raw=D.series[curKey];
+  let s=0,e=raw.length-1;                  // 截首尾空段
+  while(s<raw.length&&raw[s]==null)s++;
+  while(e>=0&&raw[e]==null)e--;
+  if(e-s<30) return;
+  const vals=[]; let prev=null;            // 内部缺日→前值填充
+  for(let i=s;i<=e;i++){const v=(raw[i]==null)?prev:raw[i]; prev=v; vals.push(v);}
+  const datesAll=D.dates.slice(s,e+1);
+  const {mean,sd}=rollStats(vals,curW);
+  const lo=curR>0?Math.max(0,vals.length-curR):0;
+  const xs=datesAll.slice(lo), vs=vals.slice(lo),
+        mn=mean.slice(lo), sl=sd.slice(lo);
+  const up=mn.map((m,i)=>m==null?null:m+2*sl[i]),
+        dn=mn.map((m,i)=>m==null?null:m-2*sl[i]),
+        bandH=up.map((v,i)=>(v==null||dn[i]==null)?null:v-dn[i]),
+        pb=vs.map((v,i)=>(mn[i]==null||!sl[i])?null:(v-mn[i])/(2*sl[i])+0.5),
+        bw=mn.map((m,i)=>(m==null||Math.abs(m)<1)?null:4*sl[i]/m*100);   // |m|<1bp 带宽无意义(与Python同屏蔽)
+  boll.setOption({
+    backgroundColor:"#ffffff",
+    grid:[{left:64,right:24,top:32,height:330},
+          {left:64,right:24,top:382,height:84},
+          {left:64,right:24,top:484,height:64}],
+    legend:{top:2,left:10,itemWidth:14,textStyle:{color:"#44576a"},
+      data:["利差","中轨","上轨","下轨"]},
+    tooltip:{trigger:"axis",formatter:function(ps){
+      if(!ps||!ps.length) return "";
+      let h="<b>"+ps[0].axisValue+"</b>";
+      for(const p of ps){
+        if(p.seriesName==="带"||p.seriesName==="_lo") continue;  // 堆叠载体, 非价位, 不进提示
+        const d=p.seriesName==="%B"?2:1;
+        h+="<br>"+p.marker+p.seriesName+"："+(p.value==null?"—":Number(p.value).toFixed(d));
+      }
+      return h;}},
+    axisPointer:{link:[{xAxisIndex:"all"}]},
+    xAxis:[0,1,2].map(i=>({type:"category",gridIndex:i,
+      data:xs, axisLabel:{show:i===2,color:"#7b8a9a"},
+      axisLine:{lineStyle:{color:"#b9c4cf"}},axisTick:{show:false}})),
+    yAxis:[
+      {gridIndex:0,name:"bp",scale:true,splitLine:{lineStyle:{color:"#e4e9f0"}},
+        nameLocation:"middle",nameRotate:90,nameGap:38,nameTextStyle:{color:"#7b8a9a"}},
+      {gridIndex:1,name:"%B",scale:true,splitLine:{show:false},axisLabel:{color:"#7b8a9a"},
+        nameLocation:"middle",nameRotate:90,nameGap:38,nameTextStyle:{color:"#7b8a9a"}},
+      {gridIndex:2,name:"带宽%",scale:true,splitLine:{show:false},axisLabel:{color:"#7b8a9a"},
+        nameLocation:"middle",nameRotate:90,nameGap:38,nameTextStyle:{color:"#7b8a9a"}}],
+    series:[                      // line series 须同设 itemStyle: 图例/tooltip 色标读 itemStyle 不读 lineStyle
+      {name:"_lo",type:"line",data:dn,xAxisIndex:0,yAxisIndex:0,stack:"band",
+        lineStyle:{opacity:0},symbol:"none",silent:true},   // 带体堆叠载体: 不进图例, 点"下轨"只藏线不塌带
+      {name:"带",type:"line",data:bandH,xAxisIndex:0,yAxisIndex:0,stack:"band",
+        lineStyle:{opacity:0},areaStyle:{color:"rgba(42,120,214,.07)"},
+        symbol:"none",silent:true},
+      {name:"下轨",type:"line",data:dn,xAxisIndex:0,yAxisIndex:0,
+        itemStyle:{color:"#7b8a9a"},lineStyle:{color:"#7b8a9a",width:1},symbol:"none"},
+      {name:"上轨",type:"line",data:up,xAxisIndex:0,yAxisIndex:0,
+        itemStyle:{color:"#7b8a9a"},lineStyle:{color:"#7b8a9a",width:1},symbol:"none"},
+      {name:"中轨",type:"line",data:mn,xAxisIndex:0,yAxisIndex:0,
+        itemStyle:{color:"#eb6834"},lineStyle:{color:"#eb6834",width:1.5},symbol:"none"},
+      {name:"利差",type:"line",data:vs,xAxisIndex:0,yAxisIndex:0,
+        itemStyle:{color:"#2a78d6"},lineStyle:{color:"#2a78d6",width:2},symbol:"none"},
+      {name:"%B",type:"line",data:pb,xAxisIndex:1,yAxisIndex:1,
+        itemStyle:{color:"#2a78d6"},lineStyle:{color:"#2a78d6",width:1.5},symbol:"none",
+        markLine:{symbol:"none",silent:true,label:{show:false},
+          lineStyle:{color:"#b9c4cf",type:"dashed"},
+          data:[{yAxis:0},{yAxis:0.5},{yAxis:1}]}},
+      {name:"带宽",type:"line",data:bw,xAxisIndex:2,yAxisIndex:2,
+        itemStyle:{color:"#1baf7a"},lineStyle:{color:"#1baf7a",width:1.5},symbol:"none"},
+    ],
+  },true);
+}
+
+document.querySelectorAll(".filters2 .vchip[data-w]").forEach(ch=>
+  ch.addEventListener("click",()=>{
+    document.querySelectorAll(".filters2 .vchip[data-w]").forEach(c=>c.classList.remove("on"));
+    ch.classList.add("on"); curW=+ch.dataset.w; renderBoll();
+  }));
+document.querySelectorAll(".filters2 .vchip[data-r]").forEach(ch=>
+  ch.addEventListener("click",()=>{
+    document.querySelectorAll(".filters2 .vchip[data-r]").forEach(c=>c.classList.remove("on"));
+    ch.classList.add("on"); curR=+ch.dataset.r; renderBoll();
+  }));
+window.addEventListener("resize",()=>{q.resize(); boll.resize();});
+
+/* ③ 下拉直选下钻品种(68只按板块分组), 与点行/点四象限等效 */
+(function(){
+  const sel=document.getElementById("dd-pick");
+  let h="",g=null;
+  for(const r of D.rows){
+    if(r.group!==g){if(g)h+="</optgroup>";g=r.group;h+='<optgroup label="'+g+'">';}
+    h+='<option value="'+r.key+'">'+r.name+" "+r.tenor+"Y</option>";
+  }
+  sel.innerHTML=h+(g?"</optgroup>":"");
+  sel.addEventListener("change",()=>drill(sel.value));
+})();
+
+/* 默认下钻: 价值区最便宜者(无则全表最高分位) → ③ 首屏即有图 */
+(function(){
+  const byPct=(a,b)=>b.pct["3Y"]-a.pct["3Y"];
+  const pick=D.rows.filter(r=>sigOf(r)==="价值区").sort(byPct)[0]
+    ||D.rows.filter(r=>r.pct["3Y"]!=null).sort(byPct)[0];
+  if(pick) drill(pick.key);
+})();
+}
+(function () {
+  var v = "variety-" + new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  var s = document.createElement("script");
+  s.src = "assets/data/data.js?v=" + v;
+  s.onload = function () {
+    var go = function () {
+      boot();
+      if (location.hash === "#overview") showPage("overview");   // #overview 直达：数据就绪后重渲染总览
+    };
+    if (typeof DATA !== "undefined" && DATA.variety) return go();
+    // 方案A拆分：variety 在独立 chunk（版本随内容变化，未变时走 immutable 缓存）
+    var vers = (typeof DATA !== "undefined" && DATA.meta && DATA.meta.vers) || {};
+    fetch("assets/data/m_variety.json?v=" + (vers.variety || v))
+      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(function (j) { DATA.variety = j; go(); })
+      .catch(function () {
+        document.getElementById("side-foot").textContent = location.protocol === "file:"
+          ? "file:// 下无法按需加载模块数据，请经 HTTP 访问" : "m_variety.json 加载失败";
+      });
+  };
+  s.onerror = function () { document.getElementById("side-foot").textContent = "data.js 加载失败"; };
+  document.head.appendChild(s);
+})();
+</script>
+</body>
+</html>
