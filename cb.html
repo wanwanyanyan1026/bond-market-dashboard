@@ -26,7 +26,7 @@
   .card-title { padding-right: 0; }
   .temp-dims { min-width: 0; }
   .grid > .card { min-width: 0; }   /* grid-2 单列 1fr 隐含 minmax(auto,1fr)，表格 min-content 会把卡片撑出视口 */
-  .card > div[id^="tbl-"] { overflow-x: auto; }
+  .card div:has(> table.tbl) { overflow-x: auto; }   /* 表容器横向滚动（覆盖 tbl-*/-tbl/无id 三类） */
 }
 .risk-note {
   font-size: 12px; color: var(--muted); line-height: 1.6;
@@ -240,6 +240,12 @@
     <div class="kpi-row" id="pan-kpis"></div>
   </div>
 
+  <div class="card" id="ratdn-card" style="display:none">
+    <div class="badge">债券信用评级表 · 近 6 月</div>
+    <div class="card-title">评级下调迁移</div>
+    <div id="ratdn-tbl"></div>
+  </div>
+
   <div class="grid grid-2">
     <div class="card">
       <div class="card-title">价格分布</div>
@@ -284,7 +290,7 @@
 
 </main>
 
-<script src="assets/data/data.js?v=cb-33"></script>
+<script src="assets/data/data.js?v=cb-35"></script>
 <script src="assets/js/echarts.min.js"></script>
 <script>
 /* ============================================================
@@ -853,6 +859,7 @@ const remCell = m => m.rem == null ? "—" :
 /* ============================================================ Tab2 全景 */
 (function renderPanorama() {
   const kpiD = P.kpi || {};
+  const pctP = x => (x == null || isNaN(x)) ? "—" : (x * 100).toFixed(0) + "%";
   document.getElementById("pan-date").textContent = "截面 " + (P.asOf || "—");
   const strat = P.strat || {}, rg = strat.regime || {};
   document.getElementById("pan-kpis").innerHTML = [
@@ -862,11 +869,25 @@ const remCell = m => m.rem == null ? "—" :
     kpi("纯债溢价中位", fmt2(kpiD.medDbPrem), "%"),
     kpi("中位YTM", fmt2(kpiD.medYtm), "%"),
     kpi("双低中位", fmt2(kpiD.medDualLow), ""),
+    kpi("偏股/平衡/偏债", kpiD.nParEq == null ? "—" : `${kpiD.nParEq}/${kpiD.nParBal}/${kpiD.nParDb}`, "只 · 平价≥110 / 70-110 / <70（平价带代理，非多因子动态分型）"),
+    kpi("纯债溢价<-5%", kpiD.dbLow == null ? "—" : kpiD.dbLow + " 只", "信用负面代理 · 榜单标红"),
+    kpi("中位价全史分位", pctP(kpiD.pctPrice), `溢价 ${pctP(kpiD.pctPrem)} · 双低 ${pctP(kpiD.pctDualLow)} · 月频样本 ${kpiD.histMonths ?? "—"} 月`),
+    kpi("近30日新发", kpiD.newIss30 == null ? "—" : kpiD.newIss30 + " 只", (kpiD.newIss30Bal == null || kpiD.newIss30Bal <= 0) ? "余额暂未收录" : `剩余规模约 ${kpiD.newIss30Bal} 亿`),
     kpi("<110元券数", kpiD.below110 == null ? "—" : kpiD.below110 + " 只", `<span class="flat">百元下 ${kpiD.below100 ?? "—"} 只</span>`),
     `<div class="anchor"><div class="anchor-label">周期判定</div>
      <div><span class="regime-chip ${rg.strong ? "regime-strong" : "regime-weak"}">${rg.strong ? "强周期" : "弱周期"}</span>
      <span class="anchor-chg flat" style="display:block;margin-top:3px">动量 ${fmt2(rg.momentum)}% · 温度 ${fmt2(rg.temperature)}</span></div></div>`,
   ].join("");
+
+  /* 评级下调迁移（近 6 月；无下调时整卡隐藏） */
+  const ratdn = P.ratdn || [];
+  if (ratdn.length) {
+    document.getElementById("ratdn-card").style.display = "";
+    document.getElementById("ratdn-tbl").innerHTML = tblHTML(
+      [{t: "转债"}, {t: "原评级", num: 1}, {t: "新评级", num: 1}, {t: "评级日", num: 1}],
+      ratdn.map(a => [`<span class="strong">${a.b}</span>`, a.from || "—",
+                      `<span style="color:#c24135;font-weight:600">${a.to}</span>`, a.date || "—"]));
+  }
 
   /* 策略雷达四榜（附剩余规模，<3亿标⚠） */
   const defs = [
@@ -883,6 +904,9 @@ const remCell = m => m.rem == null ? "—" :
   document.getElementById("strat-note").textContent =
     `当前 ${rg.strong ? "强" : "弱"}周期 → 主榜 ${rg.strong ? "低溢价 / 高Beta" : "双低 / 低价"}；已公告赎回/回售中的券自动剔除（黑名单）；余额<3亿 标 ⚠（流动性偏弱/易受强赎冲击）；剩余期限<0.5年 标 ⚠（临近到期兑付）`;
   document.getElementById("strat-badge").textContent = "skill 策略雷达规则 · 财汇本地";
+  /* 纯债溢价<-5%：信用负面代理（2024 破局经验）标红 */
+  const pbCell = m => (m.pb != null && !isNaN(m.pb) && m.pb <= -5)
+    ? `<span style="color:#c24135;font-weight:600">${fmt2(m.pb)}</span>` : fmt2(m.pb);
   function showStrat(k) {
     const list = strat[k] || [];
     const cols = [{t: "转债"}, {t: "评级"}, {t: "价格", num: 1}, {t: "平价", num: 1}, {t: "溢价%", num: 1},
@@ -893,7 +917,7 @@ const remCell = m => m.rem == null ? "—" :
     if (k === "iv_rv") cols.push({t: "隐波差%", num: 1}, {t: "隐含波动率%", num: 1}, {t: "历史波动率%", num: 1});
     if (k === "underval") cols.push({t: "ZL模型价", num: 1}, {t: "偏离%", num: 1});
     const tbl = tblHTML(cols, list.map(m => [`<span class="strong">${m.b}</span>`, m.rt || "—", fmt2(m.p), fmt2(m.cv),
-        fmt2(m.pr), fmt2(m.dl), fmt2(m.pb), m.y == null ? "—" : fmt2(m.y), balCell(m), remCell(m),
+        fmt2(m.pr), fmt2(m.dl), pbCell(m), m.y == null ? "—" : fmt2(m.y), balCell(m), remCell(m),
         ...(k === "beta_offense" ? [fmt2(m.beta)] : []),
         ...(k === "momentum" ? [fmt2(m.mcb), m.mst == null ? "—" : fmt2(m.mst)] : []),
         ...(k === "iv_rv" ? [fmt2(m.ivd), fmt2(m.iv), fmt2(m.hv)] : []),

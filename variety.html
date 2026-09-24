@@ -44,6 +44,17 @@
   border:1px solid var(--v-border);border-radius:6px;padding:2px 6px;max-width:250px}
 .chartnote{color:var(--v-muted);font-size:12px;margin-top:6px;line-height:1.6}
 .vfoot{margin:6px 0 40px;color:var(--v-muted);font-size:12px;line-height:1.8}
+/* 页3 信用债策略视图（ficc-credit-bond-strategy skill）：轻表格/情景卡/分位条形图 */
+.ctbl{border-collapse:collapse;width:100%;font-size:12px;font-variant-numeric:tabular-nums}
+.ctbl th{color:var(--v-muted);font-weight:600;text-align:right;padding:3px 8px;border-bottom:1px solid var(--v-grid);white-space:nowrap}
+.ctbl td{padding:3px 8px;text-align:right;border-bottom:1px solid var(--v-grid);white-space:nowrap}
+.ctbl th.l,.ctbl td.l{text-align:left}
+#ch-cpct{width:100%;height:430px}
+.scenrow{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 2px}
+.scencard{flex:1 1 240px;border:1px solid var(--v-border);border-radius:6px;padding:8px 10px;font-size:12px;line-height:1.7;background:#fff;border-left:3px solid #8a95a5}
+.scencard .t{font-weight:700;margin-bottom:2px;color:var(--v-ink2)}
+.scencard.bull{border-left-color:#16865c}.scencard.bull .t{color:#16865c}
+.scencard.bear{border-left-color:#c24135}.scencard.bear .t{color:#c24135}
 /* 移动端断点（配方同 cb.html 09-17c：terminal.css 全站无窄屏适配，页面级内联；
    .grid 规则兼护总览视图 #ov-root 里 value.js 渲染的 grid-2） */
 @media (max-width: 1100px) { .grid-2 { grid-template-columns: 1fr; } }
@@ -55,6 +66,8 @@
   .grid > .card { min-width: 0; }        /* 1fr 隐含 minmax(auto,1fr)，min-content 会撑破视口 */
   .vfilters { flex-wrap: wrap; }
   .panel-h .chip { white-space: normal; } /* #meta-line 长文本 nowrap 撑破视口（terminal.css:256） */
+  table.ctbl { display: block; overflow-x: auto; }  /* 信用视图六列 nowrap 表窄屏横向滚动 */
+  #cred-root .chartnote { overflow-wrap: anywhere; } /* 工作流箭头长链窄屏可断行 */
 }
 </style>
 </head>
@@ -65,6 +78,7 @@
   <nav class="nav">
     <button class="menu-link" id="btn-overview"><i class="menu-ico">⚖️</i>总览</button>
     <button class="menu-link active" id="btn-variety"><i class="menu-ico">🎯</i>品种性价比</button>
+    <button class="menu-link" id="btn-credit"><i class="menu-ico">🛡️</i>信用债策略</button>
     <a class="menu-link" href="index.html"><i class="menu-ico">←</i>返回主站</a>
   </nav>
   <div class="sidebar-foot" id="side-foot">数据更新于 —</div>
@@ -123,6 +137,12 @@
   <div class="vfoot" id="foot"></div>
 </section>
 
+<!-- 页3 信用债策略（ficc-credit-bond-strategy skill，DATA.ficc.credit，m_ficc.json 按需懒加载） -->
+<section id="view-credit" hidden>
+  <h2 class="panel-h">信用债策略 <span id="cred-meta" class="chip" style="margin-left:8px"></span></h2>
+  <div id="cred-root"></div>
+</section>
+
 </main>
 
 <script src="assets/js/echarts.min.js"></script>
@@ -172,12 +192,14 @@ var App = {
   },
 };
 
-/* ============ 两页切换：⚖️总览（主站 value 面板渲染）/ 🎯品种性价比 ============ */
+/* ============ 三视图切换：⚖️总览（主站 value 面板）/ 🎯品种性价比 / 🛡️信用债策略 ============ */
 function showPage(p) {
   document.getElementById("view-overview").hidden = p !== "overview";
   document.getElementById("view-main").hidden = p !== "variety";
+  document.getElementById("view-credit").hidden = p !== "credit";
   document.getElementById("btn-overview").classList.toggle("active", p === "overview");
   document.getElementById("btn-variety").classList.toggle("active", p === "variety");
+  document.getElementById("btn-credit").classList.toggle("active", p === "credit");
   history.replaceState(null, "", "#" + p);
   const foot = document.getElementById("side-foot");
   if (p === "overview") {
@@ -191,6 +213,12 @@ function showPage(p) {
     } else {
       r.innerHTML = '<div class="empty">value 段未就绪（构建降级/数据未加载）</div>';
     }
+  } else if (p === "credit") {
+    /* 懒初始化（cb.html 配方）：容器可见后才 echarts.init，首次进入渲染 + 双 rAF resize */
+    if (!credBuilt) renderCredit();
+    requestAnimationFrame(function () { requestAnimationFrame(function () {
+      credCharts.forEach(function (c) { c.resize(); });
+    }); });
   } else {
     /* 品种性价比可能在 hidden 期由 boot() 渲染（#overview 直达场景）→ 激活时统一 resize（q/boll 页内监听） */
     window.dispatchEvent(new Event("resize"));
@@ -200,7 +228,11 @@ function showPage(p) {
 }
 document.getElementById("btn-overview").addEventListener("click", function () { showPage("overview"); });
 document.getElementById("btn-variety").addEventListener("click", function () { showPage("variety"); });
-showPage(location.hash === "#overview" ? "overview" : "variety");
+document.getElementById("btn-credit").addEventListener("click", function () { showPage("credit"); });
+(function () {
+  var h0 = location.hash.slice(1);
+  showPage(h0 === "overview" || h0 === "credit" ? h0 : "variety");
+})();
 
 /* 数据加载：日期键自动防陈旧（data.js 每日重写，缓存键每日轮换） */
 function boot(){
@@ -493,7 +525,9 @@ document.querySelectorAll(".filters2 .vchip[data-r]").forEach(ch=>
     document.querySelectorAll(".filters2 .vchip[data-r]").forEach(c=>c.classList.remove("on"));
     ch.classList.add("on"); curR=+ch.dataset.r; renderBoll();
   }));
-window.addEventListener("resize",()=>{q.resize(); boll.resize();});
+window.addEventListener("resize",()=>{q.resize(); boll.resize();
+  /* credit 图隐藏期禁 resize（[hidden] 容器宽 0 会塌缩画布，demo 同款坑），切回时双 rAF 恢复 */
+  if(!document.getElementById("view-credit").hidden) credCharts.forEach(c=>c.resize());});
 
 /* ③ 下拉直选下钻品种(68只按板块分组), 与点行/点四象限等效 */
 (function(){
@@ -515,6 +549,154 @@ window.addEventListener("resize",()=>{q.resize(); boll.resize();});
   if(pick) drill(pick.key);
 })();
 }
+
+/* ================= 页3 信用债策略（ficc-credit-bond-strategy skill，DATA.ficc.credit） ================= */
+var credCharts = [], credBuilt = false, _ficcP = null;
+function ensureFicc() {          /* m_ficc.json 按需懒加载（vers 指纹缓存键），失败不阻塞前两页 */
+  if (!_ficcP) _ficcP = new Promise(function (res) {
+    if (typeof DATA !== "undefined" && DATA.ficc && DATA.ficc.credit) return res(DATA.ficc);
+    var vers = (typeof DATA !== "undefined" && DATA.meta && DATA.meta.vers) || {};
+    fetch("assets/data/m_ficc.json?v=" + (vers.ficc || "ficc"))
+      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(function (j) { DATA.ficc = j; res(j); })
+      .catch(function () { res(null); });
+  });
+  return _ficcP;
+}
+function renderCredit() {
+  credBuilt = true;              /* 防重入：解析期 hash 直达与数据就绪后各调一次 */
+  ensureFicc().then(function (F) {
+    var root = document.getElementById("cred-root");
+    var C = F && F.credit;
+    if (!C || !C.rows || !Object.keys(C.rows).length) {
+      root.innerHTML = '<div class="empty">ficc 段未就绪（m_ficc.json 加载失败或未构建）——跑 python scripts/update.py --only ficc 并 build 刷新</div>';
+      return;
+    }
+    var RED = "#c24135", GRN = "#16865c", AMB = "#b07818", MUT = "#7b8a9a";
+    var bp = function (v) { return v == null ? "—" : Math.round(v * 100) + "bp"; };
+    var pc = function (v) { return v == null ? "—" : (v * 100).toFixed(0) + "%"; };
+    var sg = function (v) { return v == null ? "—" : (v > 0 ? "+" : "") + Number(v).toFixed(1); };
+    var disp = function (k) { return k.replace(/^_/, "").replace(/_?(\d+)Y$/, " $1Y"); };
+    var rows = C.rows, flows = C.flows || {}, hpr = C.hpr || {};
+    var aaa3 = rows["中票AAA3Y"] || {}, aaap3 = rows["中票AA+3Y"] || {};
+    document.getElementById("cred-meta").textContent =
+      "数据截止 " + C.as_of + " · 信用利差 = 品种 − 同期限国开 · 分位 2017 年起";
+    document.getElementById("side-foot").textContent = "数据更新于 " + (F.asOf || C.as_of);
+
+    /* 一句话结论（数据驱动措辞：分位档位改变结论走向） */
+    var lvlTxt = aaa3.pct2017 == null ? "—" :
+      (aaa3.pct2017 < 0.1 ? "极低分位" : aaa3.pct2017 < 0.3 ? "中低分位" : aaa3.pct2017 < 0.6 ? "中高分位" : "高分位");
+    var thin = aaa3.pct2017 == null || aaa3.pct2017 < 0.3;
+    var conclTail = thin
+      ? "利差保护极薄，carry 主要来自票息而非利差压缩空间；交易账户防“低分位+赎回反馈”的走扩弹性（参考2022-11），配置账户以3年内骑乘+品种比价参与，不追低评级。"
+      : "利差已具一定保护，carry=票息+潜在压缩空间并存；仍防赎回反馈下的走扩弹性，配置账户以3年内骑乘+品种比价参与，不追低评级。";
+    var concl = "截至 " + C.as_of + "：中票AAA 3Y 信用利差 <b>" + bp(aaa3.spread) + "</b>，处2017年来 <b>"
+      + pc(aaa3.pct2017) + "</b> " + lvlTxt + "；AA+ 3Y " + bp(aaap3.spread) + "（" + pc(aaap3.pct2017)
+      + "分位） → <b>" + conclTail + "</b>";
+
+    /* 全景锚点表：6 行覆盖六大板块（完整 12 品种矩阵/Carry/基金行为 → 本页「品种性价比」视图） */
+    var anchors = ["中票AAA3Y", "中票AA+3Y", "城投AA(2)3Y", "二级AA+3Y", "银行永续AA3Y", "产业AAA3Y"];
+    var tRows = "";
+    anchors.forEach(function (k) {
+      var v = rows[k];
+      if (!v) return;
+      var c20 = v.chg20d_bp, c90 = v.chg90d_bp, p = v.pct2017;
+      var pcolr = p == null ? MUT : (p < 0.1 ? RED : p < 0.3 ? AMB : GRN);
+      tRows += '<tr><td class="l">' + disp(k) + "</td><td>" + (v.yield == null ? "—" : Number(v.yield).toFixed(2))
+        + "</td><td><b>" + bp(v.spread) + "</b></td>"
+        + '<td><b style="color:' + pcolr + '">' + pc(p) + "</b></td>"
+        + '<td style="color:' + (c20 == null ? MUT : c20 > 0 ? RED : GRN) + '">' + sg(c20) + "</td>"
+        + '<td style="color:' + (c90 == null ? MUT : c90 > 0 ? RED : GRN) + '">' + sg(c90) + "</td></tr>";
+    });
+    var extra = [];
+    ["_评级利差AA+-AAA_3Y", "_品种利差永续AA-中票AA+_3Y"].forEach(function (k) {
+      if (rows[k]) extra.push(disp(k) + " <b>" + bp(rows[k].spread) + "</b>（" + pc(rows[k].pct2017) + "分位）");
+    });
+
+    /* 边际需求 6 机构 + 理财规模 */
+    var WHOS = ["理财", "基金公司", "保险公司", "大型银行", "证券公司", "货基"];
+    var flRows = "";
+    WHOS.forEach(function (w) {
+      var f = flows[w];
+      if (!f) return;
+      flRows += '<tr><td class="l">' + w + "</td>"
+        + '<td style="color:' + (f.net5d > 0 ? GRN : RED) + '">' + sg(f.net5d) + "</td>"
+        + '<td style="color:' + (f.net20d > 0 ? GRN : RED) + '">' + sg(f.net20d) + "</td></tr>";
+    });
+    var lc = flows["理财规模"] || {};
+    var lcNote = "理财规模（总量）：" + (lc.latest == null ? "—" : lc.latest.toFixed(0) + "亿（" + (lc.date || "—")
+      + "）· 3月变动 " + (lc.chg3m == null ? "—" : (lc.chg3m > 0 ? "+" : "") + lc.chg3m.toFixed(0) + "亿"));
+
+    /* Carry（HPR 最近期） */
+    var hprRows = Object.keys(hpr).map(function (k) {
+      return '<tr><td class="l">' + disp(k) + "</td><td>" + (hpr[k] == null ? "—" : Number(hpr[k]).toFixed(3)) + "</td></tr>";
+    }).join("");
+
+    /* 三情景 + 账户分层 */
+    var scen = [
+      {cls: "", tag: "中性", desc: "利差低位震荡，carry 薄但票息仍高于利率债；关注跨季赎回扰动", act: "3年内骑乘+品种间比价，控制回撤"},
+      {cls: "bull", tag: "利多", desc: "利率下行+配置盘负债稳定 → 利差进一步极致压缩（空间&lt;10bp）", act: "持有为主，兑现部分浮盈"},
+      {cls: "bear", tag: "利空", desc: "赎回反馈或供给冲击 → 低分位利差走扩弹性大（参考2022-11）", act: "降久期降杠杆，优先高流动性AAA"},
+    ];
+    var scenHtml = scen.map(function (s) {
+      return '<div class="scencard ' + s.cls + '"><div class="t">' + s.tag + "</div>" + s.desc
+        + "<br><b>动作：</b>" + s.act + "</div>";
+    }).join("");
+
+    root.innerHTML =
+      '<div class="card"><div class="chartnote" style="margin:0"><b>skill 工作流对照：</b>锁定时点与账户 → 收益=无风险利率+信用利差拆解 → 供给 → <b>边际需求（理财/基金净买入）</b> → <b>估值（利差分位）</b> → 真实成交（缺口） → 信用检查（缺口） → <b>策略（期限/评级/品种+DV01）</b> → 三情景。</div></div>'
+      + '<div class="card"><div class="card-title">⭐ 一句话结论 <span class="card-sub">dated · 数据驱动</span></div>'
+      + '<div style="font-size:13px;line-height:1.9">' + concl + "</div></div>"
+      + '<div class="grid grid-2">'
+      + '<div class="card"><div class="card-title">① 信用利差全景锚点（vs 同期限国开）<span class="card-sub">完整12品种分位矩阵 / Carry / 基金行为 → 本页「品种性价比」视图</span></div>'
+      + '<table class="ctbl"><thead><tr><th class="l">品种</th><th>收益率%</th><th>利差</th><th>2017分位</th><th>20日bp</th><th>90日bp</th></tr></thead><tbody>'
+      + tRows + "</tbody></table>"
+      + (extra.length ? '<div class="chartnote">' + extra.join(" · ") + "</div>" : "")
+      + "</div>"
+      + '<div class="card"><div class="card-title">② 利差分位（2017起）<span class="card-sub">红&lt;10% · 琥珀10-30% · 绿≥30%</span></div><div id="ch-cpct"></div></div>'
+      + "</div>"
+      + '<div class="grid grid-2">'
+      + '<div class="card"><div class="card-title">③ 边际需求：信用债净买入（亿元）<span class="card-sub">marginal demand</span></div>'
+      + '<table class="ctbl"><thead><tr><th class="l">机构</th><th>5日</th><th>20日</th></tr></thead><tbody>'
+      + flRows + "</tbody></table>"
+      + '<div class="chartnote">' + lcNote + "<br>注：ETF/摊余产品申赎、TKN-GVN 成交数据未接入 → 真实交易验证为缺口。</div></div>"
+      + '<div class="card"><div class="card-title">④ Carry：持有收益（最近期）<span class="card-sub">月度 HPR 口径</span></div>'
+      + '<table class="ctbl"><thead><tr><th class="l">品种</th><th>水平%</th></tr></thead><tbody>'
+      + hprRows + "</tbody></table>"
+      + '<div class="chartnote">月度持有收益（含票息与价格变动），用于骑乘/持有期比较；口径见券种持有收益skill管线。</div></div>'
+      + "</div>"
+      + '<div class="card"><div class="card-title">⑤ 三情景与策略 <span class="card-sub">scenarios & implementation</span></div>'
+      + '<div class="scenrow">' + scenHtml + "</div>"
+      + '<div class="chartnote"><b>账户分层：</b>稳定负债（定开/配置）账户可持有 3-5Y AAA 吃票息；交易/通道账户久期≤3、杠杆中性，设利差 DV01 限额；退出条件=理财规模连续2周收缩或基金净买入20日转负。</div>'
+      + '<div class="vfoot" style="margin:10px 0 0">方法论：ficc-credit-bond-strategy skill。数据经债市跟踪UI storage 管线落地，分位在各自可得历史内计算；自动生成，不构成投资建议。</div></div>';
+
+    /* 利差分位条形图（12 品种，红<10% / 琥珀<30% / 绿≥30%）——容器可见后 init，懒加载配方 */
+    var order = ["中票AAA3Y", "中票AAA5Y", "中票AAA10Y", "中票AA+3Y", "中票AA3Y",
+                 "城投AA+3Y", "城投AA(2)3Y", "产业AAA3Y", "二级AAA-5Y", "二级AA+3Y",
+                 "银行永续AA3Y", "银行永续AA5Y"];
+    var names = [], vals = [];
+    order.forEach(function (k) {
+      if (rows[k] && rows[k].pct2017 != null) { names.push(disp(k)); vals.push(rows[k].pct2017 * 100); }
+    });
+    var ch = echarts.init(document.getElementById("ch-cpct"));
+    ch.setOption({
+      backgroundColor: "#ffffff",
+      tooltip: {formatter: function (p) { return p.name + "：" + Number(p.value).toFixed(1) + "% 分位"; }},
+      grid: {left: 110, right: 46, top: 14, bottom: 28},
+      xAxis: {type: "value", max: 100, axisLabel: {formatter: "{value}%", color: MUT},
+              splitLine: {lineStyle: {color: "#e4e9f0"}}},
+      yAxis: {type: "category", data: names.slice().reverse(), axisLabel: {color: "#44576a"}},
+      series: [{type: "bar", barWidth: 12,
+        data: vals.slice().reverse().map(function (v) {
+          var r = Math.round(v * 10) / 10;   /* 分位展示保留 1 位小数 */
+          return {value: r, itemStyle: {color: v < 10 ? RED : v < 30 ? AMB : GRN}};
+        }),
+        label: {show: true, position: "right", formatter: "{c}%", color: MUT, fontSize: 11}}],
+    });
+    credCharts.push(ch);
+    requestAnimationFrame(function () { credCharts.forEach(function (c) { c.resize(); }); });
+  });
+}
 (function () {
   var v = "variety-" + new Date().toISOString().slice(0, 10).replace(/-/g, "");
   var s = document.createElement("script");
@@ -523,6 +705,7 @@ window.addEventListener("resize",()=>{q.resize(); boll.resize();});
     var go = function () {
       boot();
       if (location.hash === "#overview") showPage("overview");   // #overview 直达：数据就绪后重渲染总览
+      if (location.hash === "#credit") showPage("credit");       // #credit 直达：renderCredit 自取 m_ficc.json（防重入守卫）
     };
     if (typeof DATA !== "undefined" && DATA.variety) return go();
     // 方案A拆分：variety 在独立 chunk（版本随内容变化，未变时走 immutable 缓存）
