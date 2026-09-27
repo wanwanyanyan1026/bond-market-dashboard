@@ -164,15 +164,20 @@ PANELS["liquidity"] = {
     const nrs = Object.entries((ncd && ncd.rateSeries) || {})
       .filter(([, s]) => s && Array.isArray(s.dates) && s.dates.length && has(s.values))
       .map(([name, s]) => ({name, dates: s.dates, values: s.values}));
+    const nwk = Object.entries((ncd && ncd.weekly) || {})   // 天风周度兜底（口径独立，不进日线图）
+      .filter(([, s]) => s && Array.isArray(s.dates) && s.dates.length && has(s.values));
     const ncdEmpty = !ntRows.length && !nrs.length;
     const ncdTableBox = h("div", {id: "liq-ncd-table"});
     const ncdChartBox = h("div", {id: "liq-ncd-chart", class: "chart"});
+    const ncdWeeklyBox = h("div", {id: "liq-ncd-weekly", style: {marginTop: "10px"}});
     const ncdCard = h("section", {class: "card", id: "liq-ncd-card"}, [
       h("h3", {class: "card-title"}, ["存单（NCD）"]),
       App.badge("DM · 一级发行"),
-      h("p", {class: "card-sub"}, ["分期限发行/净融资表 + 一级发行利率 1M/3M/1Y（政策锚线见资金利率图 OMO 7D）"]),
+      h("p", {class: "card-sub"}, ["分期限发行/净融资表 + 一级发行利率 1M/3M/1Y（政策锚线见资金利率图 OMO 7D）"
+        + (nwk.length ? " · 末表=天风周度兜底（口径独立，与上图日度不可直接对标）" : "")]),
       ncdEmpty ? h("div", {class: "empty"}, ["存单一级发行利率与分期限净融资待 DM 源接入"])
-        : [ntRows.length ? ncdTableBox : null, nrs.length ? ncdChartBox : null],
+        : [ntRows.length ? ncdTableBox : null, nrs.length ? ncdChartBox : null,
+           nwk.length ? ncdWeeklyBox : null],
     ]);
 
     /* —— ⑥ 票据：转贴 1M/3M/6M（+直贴如有，序列名区分） —— */
@@ -238,6 +243,15 @@ PANELS["liquidity"] = {
     if (ntRows.length) Charts.table(ncdTableBox, {                   // 表结构随源（当前空）原样消费
       columns: ntCols.map((c, i) => ({key: "k" + i, label: c})), rows: ntRows});
     if (nrs.length) Charts.line(ncdChartBox, {series: nrs, yUnit: "%", range: "3Y"});
+    if (nwk.length) Charts.table(ncdWeeklyBox, {          // 天风周度兜底表：兴证日度断档期可见
+      columns: [{key: "k0", label: "天风周度加权发行利率"}, {key: "k1", label: "最新(%)", num: true},
+                {key: "k2", label: "较前周(BP)", num: true}, {key: "k3", label: "截至"}],
+      rows: nwk.map(([name, s]) => {
+        const i = s.values.length - 1;
+        const chg = i > 0 ? (s.values[i] - s.values[i - 1]) * 100 : null;
+        return [name.replace("存单发行利率周度|", ""), App.fmt(s.values[i], 2),
+                chg == null ? "—" : (chg >= 0 ? "+" : "") + chg.toFixed(0), s.dates[i]];
+      })});
     if (bills.length) Charts.line(billBox, {series: bills, yUnit: "%", range: "3Y"});
     if (nwRows.length) Charts.table(nextBox, {
       columns: nwCols.map((c, i) => ({key: "k" + i, label: c, num: i >= 1})),
