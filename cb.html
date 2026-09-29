@@ -614,6 +614,19 @@ const remCell = m => m.rem == null ? "—" :
       series: [{type: "line", data: emo.map(e => e[1]), symbol: "none",
                 lineStyle: {width: 2, color: "#1769aa"},
                 areaStyle: {color: "rgba(23,105,170,.08)"}}]});
+  } else if (extra.dongwu && extra.dongwu.sentiment_md) {
+    /* 华泰情绪指数故障期：东吴机构情绪矩阵·日对比（基金客群行业买入/卖出家数变化） */
+    const dw = extra.dongwu;
+    if (dw.sentiment_date) document.getElementById("emo-date").textContent = dw.sentiment_date.slice(5);
+    const rows = dw.sentiment_md.split(String.fromCharCode(10))
+      .filter(l => l.trim().startsWith("|"))
+      .map(l => l.trim().replace(/^\||\|$/g, "").split("|").map(x => x.trim()))
+      .filter(r => r.length >= 4 && r[0] && r[0] !== "行业" && !/^[-: ]+$/.test(r[1]));
+    document.getElementById("ch-emo").innerHTML =
+      `<div style="font-size:12px;color:#8a93a3;margin:2px 0 8px">机构情绪矩阵 · 日度对比（东吴宏观量化；买入/卖出=各机构客群行业配置家数变化）</div>` +
+      tblHTML([{t: "行业"}, {t: "买入变化"}, {t: "卖出变化"}, {t: "说明"}],
+        rows.slice(0, 14).map(r => [r[0], r[1], r[2], r[3] || ""])) +
+      `<div style="font-size:11px;color:#8a93a3;margin-top:6px">华泰A股情绪指数恢复后自动切回曲线</div>`;
   } else {
     document.getElementById("ch-emo").innerHTML = `<div class="empty">本期未获取（接口失败或未配置）</div>`;
   }
@@ -648,7 +661,15 @@ const remCell = m => m.rem == null ? "—" :
     ? cap.map(c => kpi(CAP_SHORT[c[0]] || c[0],
         `<span class="${updown(c[2])}">${(c[2] > 0 ? "+" : "") + c[2]}</span>`,
         `${String(c[1]).slice(5)} · ${c[3] || "亿元"}`)).join("")
-    : `<div class="empty">本期未获取（接口失败或未配置）</div>`;
+    : (extra.dongwu && extra.dongwu.etf
+      ? `<div style="font-size:12px;color:#8a93a3;margin:0 0 8px">ETF 申赎 Top5（东吴资金流库 · ${(extra.dongwu.etf.date || "").slice(5)} · 亿元；华泰六指标恢复后自动切回）</div>` +
+        `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">` +
+        tblHTML([{t: "净申购 Top5"}, {t: "亿元", num: 1}],
+          extra.dongwu.etf.in.map(r => [r[0], r[1] == null ? "—" : r[1].toFixed(1)])) +
+        tblHTML([{t: "净赎回 Top5"}, {t: "亿元", num: 1}],
+          extra.dongwu.etf.out.map(r => [r[0], r[1] == null ? "—" : r[1].toFixed(1)])) +
+        `</div>`
+      : `<div class="empty">本期未获取（接口失败或未配置）</div>`);
   const capDs = cap.map(c => String(c[1])).filter(s => /^\d{4}-\d{2}-\d{2}$/.test(s)).sort();
   document.getElementById("cap-date").textContent = capDs.length ? capDs[capDs.length - 1].slice(5) : "—";
   document.getElementById("cap-risk").textContent = RISK;
@@ -1090,7 +1111,8 @@ function initPanCharts() {
   const ind = P2.ind || [];
   if (ind.length) {
     document.getElementById("ind-date2").textContent = ind[0].d;
-    document.getElementById("ind-date").textContent = "景气期：" + ind[0].d + "（0-100）";
+    document.getElementById("ind-date").textContent = "景气期：" + ind[0].d + "（0-100）" +
+      (P2.indSrc === "dongwu" ? " · 东吴择时性价比（日频·源截断仅20行，华泰景气恢复后自动切回）" : "");
     const srt = [...ind].sort((a, b) => a.v - b.v);   // 横向条形：值小的在下
     ch("ch-ind", {
       tooltip: {},
