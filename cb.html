@@ -290,7 +290,7 @@
 
 </main>
 
-<script src="assets/data/data.js?v=2026-09-29.1458"></script>
+<script src="assets/data/data.js?v=2026-09-29.2133"></script>
 <script src="assets/js/echarts.min.js"></script>
 <script>
 /* ============================================================
@@ -622,7 +622,13 @@ const remCell = m => m.rem == null ? "—" :
       .filter(l => l.trim().startsWith("|"))
       .map(l => l.trim().replace(/^\||\|$/g, "").split("|").map(x => x.trim()))
       .filter(r => r.length >= 4 && r[0] && r[0] !== "行业" && !/^[-: ]+$/.test(r[1]));
-    document.getElementById("ch-emo").innerHTML =
+    /* .chart 是 echarts 固定高度容器（terminal.css）：兜底表格更高会溢出压到
+       下方拥挤度块（2026-09-29 重叠根因）→ 高度转 auto+限高滚动，卡片整体下移 */
+    const emoBox = document.getElementById("ch-emo");
+    emoBox.style.height = "auto";
+    emoBox.style.maxHeight = "440px";
+    emoBox.style.overflowY = "auto";
+    emoBox.innerHTML =
       `<div style="font-size:12px;color:#8a93a3;margin:2px 0 8px">机构情绪矩阵 · 日度对比（东吴宏观量化；买入/卖出=各机构客群行业配置家数变化）</div>` +
       tblHTML([{t: "行业"}, {t: "买入变化"}, {t: "卖出变化"}, {t: "说明"}],
         rows.slice(0, 14).map(r => [r[0], r[1], r[2], r[3] || ""])) +
@@ -661,15 +667,9 @@ const remCell = m => m.rem == null ? "—" :
     ? cap.map(c => kpi(CAP_SHORT[c[0]] || c[0],
         `<span class="${updown(c[2])}">${(c[2] > 0 ? "+" : "") + c[2]}</span>`,
         `${String(c[1]).slice(5)} · ${c[3] || "亿元"}`)).join("")
-    : (extra.dongwu && extra.dongwu.etf
-      ? `<div style="font-size:12px;color:#8a93a3;margin:0 0 8px">ETF 申赎 Top5（东吴资金流库 · ${(extra.dongwu.etf.date || "").slice(5)} · 亿元；华泰六指标恢复后自动切回）</div>` +
-        `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">` +
-        tblHTML([{t: "净申购 Top5"}, {t: "亿元", num: 1}],
-          extra.dongwu.etf.in.map(r => [r[0], r[1] == null ? "—" : r[1].toFixed(1)])) +
-        tblHTML([{t: "净赎回 Top5"}, {t: "亿元", num: 1}],
-          extra.dongwu.etf.out.map(r => [r[0], r[1] == null ? "—" : r[1].toFixed(1)])) +
-        `</div>`
-      : `<div class="empty">本期未获取（接口失败或未配置）</div>`);
+    /* 东吴ETF申赎兜底已移除（2026-09-29 用户：与下方「A股ETF资金流向」卡重复），
+       资金面卡口径回归华泰六指标，源故障期如实显示缺省 */
+    : `<div class="empty">华泰资金面接口故障中，本期未获取（恢复后自动回填）；ETF 维度见下方「A股ETF资金流向」卡</div>`;
   const capDs = cap.map(c => String(c[1])).filter(s => /^\d{4}-\d{2}-\d{2}$/.test(s)).sort();
   document.getElementById("cap-date").textContent = capDs.length ? capDs[capDs.length - 1].slice(5) : "—";
   document.getElementById("cap-risk").textContent = RISK;
