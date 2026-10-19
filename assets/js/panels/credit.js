@@ -143,7 +143,7 @@ PANELS["credit"] = {
     root.append(Export.btn("credit"));
     root.append(h("section", {class: "card", id: "credit-card"}, [
       h("h3", {class: "card-title"}, ["信用舆情跟踪"]),
-      App.badge("舆情跟踪.xlsx 手工录入", C.asOf),
+      App.badge("舆情跟踪.xlsx + 金山文档(2026-08-04起) 双源", C.asOf),
       items.length ? [
         h("div", {style: {display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center", margin: "10px 0"}},
           [...chips, countNote]),
