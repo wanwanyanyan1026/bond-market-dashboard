@@ -594,8 +594,9 @@ function renderCredit() {
       + pc(aaa3.pct2017) + "</b> " + lvlTxt + "；AA+ 3Y " + bp(aaap3.spread) + "（" + pc(aaap3.pct2017)
       + "分位） → <b>" + conclTail + "</b>";
 
-    /* 全景锚点表：6 行覆盖六大板块（完整 12 品种矩阵/Carry/基金行为 → 本页「品种性价比」视图） */
-    var anchors = ["中票AAA3Y", "中票AA+3Y", "城投AA(2)3Y", "二级AA+3Y", "银行永续AA3Y", "产业AAA3Y"];
+    /* 全景锚点表：9 行 = 6×3Y 主锚 + 3×10Y 长端锚（完整 24 品种矩阵/Carry/基金行为 → 本页「品种性价比」视图） */
+    var anchors = ["中票AAA3Y", "中票AA+3Y", "城投AA(2)3Y", "二级AA+3Y", "银行永续AA3Y", "产业AAA3Y",
+                   "中票AAA10Y", "二级AAA-10Y", "银行永续AA10Y"];
     var tRows = "";
     anchors.forEach(function (k) {
       var v = rows[k];
@@ -627,9 +628,82 @@ function renderCredit() {
     var lcNote = "理财规模（总量）：" + (lc.latest == null ? "—" : lc.latest.toFixed(0) + "亿（" + (lc.date || "—")
       + "）· 3月变动 " + (lc.chg3m == null ? "—" : (lc.chg3m > 0 ? "+" : "") + lc.chg3m.toFixed(0) + "亿"));
 
+    /* 债券ETF申赎（东吴库）+ 债基申赎情绪（开源，标准化强度） */
+    var etf = C.etf || {}, ff = C.fundflow || {};
+    var etfRows = "";
+    ["信用类", "利率类", "转债及其他"].forEach(function (b) {
+      var e = etf[b];
+      if (!e) return;
+      etfRows += '<tr><td class="l">' + b + "</td>"
+        + '<td style="color:' + (e["5日"] > 0 ? GRN : RED) + '"><b>' + sg(e["5日"]) + "</b></td>"
+        + '<td style="color:' + (e["20日"] > 0 ? GRN : RED) + '">' + sg(e["20日"]) + "</td></tr>";
+    });
+    var etfDate = etf["信用类"] && etf["信用类"].date;
+    var ffRows = "";
+    ["纯债", "短债", "被动债券"].forEach(function (t) {
+      var f = ff[t];
+      if (!f) return;
+      ffRows += '<tr><td class="l">' + t + "</td>"
+        + '<td style="color:' + (f.latest > 0 ? GRN : RED) + '">' + (f.latest > 0 ? "+" : "") + f.latest.toFixed(2) + "</td>"
+        + '<td style="color:' + (f.avg5 > 0 ? GRN : RED) + '">' + (f.avg5 > 0 ? "+" : "") + f.avg5.toFixed(2) + "</td></tr>";
+    });
+
+    /* ⑧ 策略回测：本页独立「分位均值回归」（与量化页三因子 z-score 轮动相互独立） */
+    var ST = F.strategy || {}, tm = ST.timing || {}, ql = ST.quantile || {};
+    var ts = tm.stats || {}, tbh = tm.bh || {}, tsg = tm.signal || {};
+    var tmRows = [["累计%", "cumPct"], ["年化%", "annPct"], ["最大回撤%", "mddPct"],
+                  ["周胜率%", "winPct"], ["盈亏比", "pl"]].map(function (p) {
+      var a = ts[p[1]], b = tbh[p[1]];
+      return '<tr><td class="l">' + p[0] + "</td><td><b>" + (a == null ? "—" : a) + "</b></td>"
+        + "<td>" + (b == null ? "—" : b) + "</td></tr>";
+    }).join("");
+    var tmAnnual = (tm.annual || []).map(function (a) {
+      return a.year + "：" + a.stratPct + "/" + (a.bhPct == null ? "—" : a.bhPct) + "%";
+    }).join(" · ");
+    var qRows = (ql.groups || []).map(function (g) {
+      return '<tr><td class="l">' + g.g + "</td><td><b>" + g.meanBp + "</b></td><td>" + g.winPct
+        + "</td><td>" + (g.pl == null ? "—" : g.pl) + "</td></tr>";
+    }).join("");
+    var q15 = ql.q1q5 || {};
+    var qAnnual = (ql.annual || []).map(function (a) {
+      return a.year + "：" + (a.diffBp > 0 ? "+" : "") + a.diffBp + "bp";
+    }).join(" · ");
+    var stReady = ts.cumPct != null;
+    /* 数据驱动判词：回测结论随数字走，不写死 */
+    var tmVerdict = (ts.annPct == null || tbh.annPct == null) ? "—"
+      : ts.annPct >= tbh.annPct ? "择时跑赢买入持有"
+      : "择时未跑赢买入持有（利差中枢长期下行，滞回错过趋势段）";
+    var xsVerdict = q15.meanBp == null ? "—" : q15.meanBp > 0
+      ? "截面排序 Q1 持续优于 Q5 —— 分位更适合「选品种」而非「择时」"
+      : "截面排序本窗口未见稳定优势";
+
     /* Carry（HPR 最近期） */
     var hprRows = Object.keys(hpr).map(function (k) {
       return '<tr><td class="l">' + disp(k) + "</td><td>" + (hpr[k] == null ? "—" : Number(hpr[k]).toFixed(3)) + "</td></tr>";
+    }).join("");
+
+    /* ⑤ 真实成交（qeubee 周度 TKN/低估值）+ ⑥ 信用检查（舆情台账近30天汇总） */
+    var trade = C.trade || {}, tradeRows = "";
+    ["产业债", "二级资本债", "银行永续债"].forEach(function (w) {
+      var t = trade[w];
+      if (!t) return;
+      var tk = t["TKN占比"], tkc = t["TKN占比_chg4w"];
+      var lo = t["低估值占比"], loc = t["低估值占比_chg4w"];
+      tradeRows += '<tr><td class="l">' + w + "</td>"
+        + "<td><b>" + (tk == null ? "—" : tk.toFixed(1) + "%") + "</b></td>"
+        + '<td style="color:' + (tkc == null ? MUT : tkc > 0 ? GRN : RED) + '">' + sg(tkc) + "</td>"
+        + "<td>" + (lo == null ? "—" : lo.toFixed(1) + "%") + "</td>"
+        + '<td style="color:' + (loc == null ? MUT : loc > 0 ? GRN : RED) + '">' + sg(loc) + "</td>"
+        + "<td>" + (t["成交笔数"] == null ? "—" : t["成交笔数"].toFixed(0)) + "</td></tr>";
+    });
+    var tradeDate = trade["产业债"] && trade["产业债"].date;
+    var op = C.opinion || {};
+    var opHead = op.neg30d == null ? "" :
+      "近30天：<b style=\"color:" + RED + "\">偏负面 " + op.neg30d + "</b> · 中性 " + (op.neu30d || 0)
+      + " · <span style=\"color:" + GRN + "\">偏正面 " + (op.pos30d || 0) + "</span> · 其他 " + (op.other30d || 0);
+    var opRows = (op.latestNeg || []).map(function (n) {
+      return '<div style="font-size:12px;line-height:1.7;border-left:2px solid ' + RED + ';padding-left:8px;margin:6px 0">'
+        + n.date + " · <b>" + n.issuer + "</b> — " + n.summary + "</div>";
     }).join("");
 
     /* 三情景 + 账户分层 */
@@ -644,11 +718,11 @@ function renderCredit() {
     }).join("");
 
     root.innerHTML =
-      '<div class="card"><div class="chartnote" style="margin:0"><b>skill 工作流对照：</b>锁定时点与账户 → 收益=无风险利率+信用利差拆解 → 供给 → <b>边际需求（理财/基金净买入）</b> → <b>估值（利差分位）</b> → 真实成交（缺口） → 信用检查（缺口） → <b>策略（期限/评级/品种+DV01）</b> → 三情景。</div></div>'
+      '<div class="card"><div class="chartnote" style="margin:0"><b>skill 工作流对照：</b>锁定时点与账户 → 收益=无风险利率+信用利差拆解 → 供给 → <b>边际需求（理财/基金净买入）</b> → <b>估值（利差分位）</b> → 真实成交（qeubee 周度） → 信用检查（舆情台账汇总） → <b>策略（期限/评级/品种+DV01）</b> → 三情景 → <b>回测验证（⑧）</b>。</div></div>'
       + '<div class="card"><div class="card-title">⭐ 一句话结论 <span class="card-sub">dated · 数据驱动</span></div>'
       + '<div style="font-size:13px;line-height:1.9">' + concl + "</div></div>"
       + '<div class="grid grid-2">'
-      + '<div class="card"><div class="card-title">① 信用利差全景锚点（vs 同期限国开）<span class="card-sub">完整12品种分位矩阵 / Carry / 基金行为 → 本页「品种性价比」视图</span></div>'
+      + '<div class="card"><div class="card-title">① 信用利差全景锚点（vs 同期限国开）<span class="card-sub">完整24品种分位矩阵（3Y全评级＋5/7/10Y长端）/ Carry / 基金行为 → 本页「品种性价比」视图</span></div>'
       + '<table class="ctbl"><thead><tr><th class="l">品种</th><th>收益率%</th><th>利差</th><th>2017分位</th><th>20日bp</th><th>90日bp</th></tr></thead><tbody>'
       + tRows + "</tbody></table>"
       + (extra.length ? '<div class="chartnote">' + extra.join(" · ") + "</div>" : "")
@@ -659,26 +733,72 @@ function renderCredit() {
       + '<div class="card"><div class="card-title">③ 边际需求：信用债净买入（亿元）<span class="card-sub">marginal demand</span></div>'
       + '<table class="ctbl"><thead><tr><th class="l">机构</th><th>5日</th><th>20日</th></tr></thead><tbody>'
       + flRows + "</tbody></table>"
-      + '<div class="chartnote">' + lcNote + "<br>注：ETF/摊余产品申赎、TKN-GVN 成交数据未接入 → 真实交易验证为缺口。</div></div>"
+      + '<table class="ctbl" style="margin-top:8px"><thead><tr><th class="l">债券ETF申赎 · 亿</th><th>5日</th><th>20日</th></tr></thead><tbody>'
+      + (etfRows || '<tr><td class="l" colspan="3">—</td></tr>') + "</tbody></table>"
+      + '<table class="ctbl" style="margin-top:8px"><thead><tr><th class="l">债基申赎情绪</th><th>当日</th><th>5日均</th></tr></thead><tbody>'
+      + (ffRows || '<tr><td class="l" colspan="3">—</td></tr>') + "</tbody></table>"
+      + '<div class="chartnote">' + lcNote + "<br>注：ETF申赎=东吴资金流库申赎规模变化（" + (etfDate || "—")
+      + "，估算口径）；债基申赎=开源固收标准化强度（>0 净申购）；TKN/低估值见⑤；摊余定开申赎无公开高频源（规模见季报）。</div></div>"
       + '<div class="card"><div class="card-title">④ Carry：持有收益（最近期）<span class="card-sub">月度 HPR 口径</span></div>'
       + '<table class="ctbl"><thead><tr><th class="l">品种</th><th>水平%</th></tr></thead><tbody>'
       + hprRows + "</tbody></table>"
       + '<div class="chartnote">月度持有收益（含票息与价格变动），用于骑乘/持有期比较；口径见券种持有收益skill管线。</div></div>'
       + "</div>"
-      + '<div class="card"><div class="card-title">⑤ 三情景与策略 <span class="card-sub">scenarios & implementation</span></div>'
+      + '<div class="grid grid-2">'
+      + '<div class="card"><div class="card-title">⑤ 真实成交：TKN / 低估值<span class="card-sub">qeubee 周度 · ' + (tradeDate || "skill 第6步") + '</span></div>'
+      + (tradeRows
+        ? '<table class="ctbl"><thead><tr><th class="l">品种</th><th>TKN占比</th><th>4周Δpp</th><th>低估值占比</th><th>4周Δpp</th><th>笔数/周</th></tr></thead><tbody>'
+          + tradeRows + "</tbody></table>"
+          + '<div class="chartnote">TKN=买方主动接盘；低估值成交=成交收益率低于估值（买方溢价接盘）。两者占比升=需求偏强（绿）。城商行/农商行 sheet 无 TKN 列未接入。</div>'
+        : '<div class="empty">真实成交未就绪（ficc credit_trade 步失败时留空，下期自动恢复）</div>')
+      + "</div>"
+      + '<div class="card"><div class="card-title">⑥ 信用检查：舆情台账（近30天）<span class="card-sub">skill 第7步 · 手录+金山双源</span></div>'
+      + (opHead
+        ? '<div style="font-size:13px;line-height:1.9">' + opHead + "</div>"
+          + (opRows || '<div class="chartnote">近30天无偏负面舆情记录。</div>')
+          + '<div class="chartnote">逐条评级（偏正面/中性/偏负面）与处置进展见信用舆情页；台账至 ' + (op.asOf || "—") + "。</div>"
+        : '<div class="empty">舆情台账未就绪（credit 模块 storage/credit.json 为空）</div>')
+      + "</div>"
+      + "</div>"
+      + '<div class="card"><div class="card-title">⑦ 三情景与策略 <span class="card-sub">scenarios & implementation</span></div>'
       + '<div class="scenrow">' + scenHtml + "</div>"
       + '<div class="chartnote"><b>账户分层：</b>稳定负债（定开/配置）账户可持有 3-5Y AAA 吃票息；交易/通道账户久期≤3、杠杆中性，设利差 DV01 限额；退出条件=理财规模连续2周收缩或基金净买入20日转负。</div>'
-      + '<div class="vfoot" style="margin:10px 0 0">方法论：ficc-credit-bond-strategy skill。数据经债市跟踪UI storage 管线落地，分位在各自可得历史内计算；自动生成，不构成投资建议。</div></div>';
+      + '<div class="vfoot" style="margin:10px 0 0">方法论：ficc-credit-bond-strategy skill。数据经债市跟踪UI storage 管线落地，分位在各自可得历史内计算；自动生成，不构成投资建议。</div></div>'
+      + (stReady
+        ? '<div class="card"><div class="card-title">⑧ 策略回测：分位均值回归 <span class="card-sub">本页独立策略 · ' + (ST.asOf || "—") + ' · expanding 分位（非前视，样本≥3年起）</span></div>'
+          + '<div class="grid grid-2">'
+          + '<div>择时：中票AAA3Y 利差分位 ≥70% 持信用 / ≤40% 切国开3Y（中间滞回，周五信号次周生效，切换 5bp）'
+          + '<table class="ctbl" style="margin-top:6px"><thead><tr><th class="l">指标</th><th>策略</th><th>买入持有AAA3Y</th></tr></thead><tbody>'
+          + tmRows + "</tbody></table>"
+          + '<div class="chartnote">当前信号：<b>' + (tsg.stateTxt || "—") + "</b>（分位 " + (tsg.pct == null ? "—" : tsg.pct + "%") + "，" + (tsg.date || "—")
+          + "）· " + (tm.start || "—") + " 起 " + (ts.nWeeks || 0) + " 周，切换 " + (tm.nSwitch || 0)
+          + " 次<br>分年 策略/持有：" + (tmAnnual || "—") + "</div></div>"
+          + '<div>截面五分位：每周五按 24 品种利差分位降序分 5 组（Q1=最便宜），非重叠持有 4 周'
+          + '<table class="ctbl" style="margin-top:6px"><thead><tr><th class="l">组</th><th>4周均值bp</th><th>胜率%</th><th>盈亏比</th></tr></thead><tbody>'
+          + (qRows || '<tr><td class="l" colspan="4">—</td></tr>') + "</tbody></table>"
+          + '<div class="chartnote">Q1−Q5：均值 <b>' + (q15.meanBp == null ? "—" : q15.meanBp + "bp/4周") + "</b> · 胜率 "
+          + (q15.winPct == null ? "—" : q15.winPct + "%") + " · 盈亏比 " + (q15.pl == null ? "—" : q15.pl)
+          + " · n=" + (ql.n || 0) + "<br>分年 Q1−Q5：" + (qAnnual || "—") + "</div></div>"
+          + "</div>"
+          + '<div class="chartnote" style="margin:8px 0 0"><b>口径：</b>收益=票息−久期×ΔYTM 近似（3/5/7/10Y 久期 2.8/4.6/6.4/8.8），expanding 分位不含当期；'
+          + tmVerdict + "；" + xsVerdict + "。本策略独立于量化信号页「信用三因子 z-score 轮动」（2023 起年化 5.4%，见量化页）。自动生成，不构成投资建议。</div></div>"
+        : '<div class="card"><div class="card-title">⑧ 策略回测：分位均值回归 <span class="card-sub">本页独立策略</span></div><div class="empty">回测未就绪（ficc strategy 步失败或样本不足，下期自动恢复）</div></div>');
 
-    /* 利差分位条形图（12 品种，红<10% / 琥珀<30% / 绿≥30%）——容器可见后 init，懒加载配方 */
-    var order = ["中票AAA3Y", "中票AAA5Y", "中票AAA10Y", "中票AA+3Y", "中票AA3Y",
-                 "城投AA+3Y", "城投AA(2)3Y", "产业AAA3Y", "二级AAA-5Y", "二级AA+3Y",
-                 "银行永续AA3Y", "银行永续AA5Y"];
+    /* 利差分位条形图（24 品种 = 3Y 全评级 + 5/7/10Y 长端，红<10% / 琥珀<30% / 绿≥30%）；
+       条数翻倍 → 容器高度按品种数动态撑开（CSS 固定 430px 仅兜底） */
+    var order = ["中票AAA3Y", "中票AAA5Y", "中票AAA7Y", "中票AAA10Y",
+                 "中票AA+3Y", "中票AA+5Y", "中票AA+7Y", "中票AA+10Y", "中票AA3Y",
+                 "城投AA+3Y", "城投AA+5Y", "城投AA(2)3Y", "城投AA(2)5Y", "城投AA(2)7Y",
+                 "产业AAA3Y", "产业AAA5Y",
+                 "二级AAA-5Y", "二级AAA-7Y", "二级AAA-10Y", "二级AA+3Y", "二级AA+5Y",
+                 "银行永续AA3Y", "银行永续AA5Y", "银行永续AA10Y"];
     var names = [], vals = [];
     order.forEach(function (k) {
       if (rows[k] && rows[k].pct2017 != null) { names.push(disp(k)); vals.push(rows[k].pct2017 * 100); }
     });
-    var ch = echarts.init(document.getElementById("ch-cpct"));
+    var cpctEl = document.getElementById("ch-cpct");
+    cpctEl.style.height = Math.max(430, names.length * 22 + 60) + "px";
+    var ch = echarts.init(cpctEl);
     ch.setOption({
       backgroundColor: "#ffffff",
       tooltip: {formatter: function (p) { return p.name + "：" + Number(p.value).toFixed(1) + "% 分位"; }},

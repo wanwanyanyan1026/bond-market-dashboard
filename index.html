@@ -25,7 +25,7 @@
 </main>
 
 <!-- 依序：数据 → 图表库 → 图表封装 → 导出 → 各面板注册 → 应用路由 -->
-<script src="assets/data/data.js?v=2026-10-20.0936"></script>
+<script src="assets/data/data.js?v=2026-10-20.2145"></script>
 <script src="assets/js/echarts.min.js"></script>
 <script src="assets/js/charts.js"></script>
 <script src="assets/js/export.js"></script>
@@ -818,6 +818,7 @@ PANELS["quant"] = {
         cell("年化 @5bp", App.fmt(at5.annPct, 1) + "%", (bt.nWeeks || "?") + " 周复利"),
         cell("最大回撤", App.fmt(at5.mddPct, 2) + "%", "周频口径"),
         cell("周度胜率", at5.winPosWeek != null ? (at5.winPosWeek * 100).toFixed(0) + "%" : "—", "收益为正周占比"),
+        cell("盈亏比", at5.plRatio != null ? at5.plRatio.toFixed(2) : "—", "盈利周均收益/|亏损周均收益|"),
         cell("跑赢等权周占比", at5.winVsEw != null ? (at5.winVsEw * 100).toFixed(1) + "%" : "—",
           "周均超额 " + (at5.excessBp != null ? "+" + at5.excessBp.toFixed(1) : "—") + "bp"),
       ];
