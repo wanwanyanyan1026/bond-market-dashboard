@@ -3,7 +3,7 @@
    单卡只读展示（录入在 V:/债市跟踪UI/舆情跟踪.xlsx，页面零表单）：
      统计条：偏正面/中性/偏负面/其他 计数 chip（点击=筛选开关，单选 toggle）
      筛选区：起止日期 + 全字段关键词搜索 + 分页
-     表格：7 列按日期倒序；摘要/分析/后续 可展开完整内容；正负面彩色文字
+     表格：6 列按日期倒序（analyst 仍在数据中不展示）；摘要/分析/后续 可展开完整内容；正负面彩色文字
      分页：每页10条，底部分页导航
    消费：data.js credit 段 {asOf, count, items:[{date, issuer, summary,
    analysis, stance, followup, analyst}]}、App.badge、h（全局）
@@ -43,7 +43,7 @@ PANELS["credit"] = {
     /* 全字段关键词匹配 */
     const kwMatch = (it, kw) => {
       if (!kw) return true;
-      const fields = [it.date, it.issuer, it.summary, it.analysis, it.followup, it.analyst, it.stance];
+      const fields = [it.date, it.issuer, it.summary, it.analysis, it.followup, it.stance];
       return fields.some(f => f && String(f).includes(kw));
     };
 
@@ -91,7 +91,7 @@ PANELS["credit"] = {
       const td = (v) => h("td", {}, [(v === "" || v === null || v === undefined) ? "—" : String(v)]);
       body.append(h("table", {class: "tbl"}, [
         h("thead", {}, [h("tr", {},
-          ["日期", "主体名称", "偏正负面", "舆情摘要", "舆情分析", "后续跟踪/处置进展", "研究员"]
+          ["日期", "主体名称", "偏正负面", "舆情摘要", "舆情分析", "后续跟踪/处置进展"]
             .map(t => h("th", {}, [t])))]),
         h("tbody", {}, pageRows.map(it => h("tr", {}, [
           td(it.date), td(it.issuer),
@@ -99,7 +99,6 @@ PANELS["credit"] = {
           expandCell(it.summary),
           expandCell(it.analysis),
           expandCell(it.followup),
-          td(it.analyst),
         ])))]));
 
       // 分页导航

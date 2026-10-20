@@ -1,7 +1,7 @@
 /* ============================================================
    panels/fundamentals.js — 基本面（Task 11）
    四区：①宏观数据表（Charts.table + 走势 sparkline 列 + 行点击 modal）
-        ②本周数据及政策梳理（events 纵向时间线，manual 维护）
+        ②本周数据及政策梳理（events 纵向时间线，manual 维护；可选 detail 完整描述，展开全部后显示）
         ③海外关键指标表 + 美债四序列折线（2Y/10Y/30Y · 联邦基金）
         ④货币政策表态记录（MCP 50 条：日期/来源/标题/基调/摘要，全文本列）
    消费：App.h / App.fmt / App.badge（Task 8）、
@@ -165,6 +165,20 @@ PANELS["fundamentals"] = {
       const mon = d.getFullYear() + "-" + p2(d.getMonth() + 1) + "-" + p2(d.getDate());
       return evSorted.filter(ev => String(ev.date || "") >= mon);
     })();
+    /* detail 完整描述（auto ⑤ / 手工条目可选字段）：默认收起，展开后显示更完整的
+       数据/政策脉络；content/note 始终为简洁表述 */
+    const detailBlock = (ev) => {
+      const box = h("div", {style: {display: "none", marginTop: "4px", whiteSpace: "pre-line",
+        borderLeft: "2px solid var(--line-soft)", paddingLeft: "10px"}}, [ev.detail]);
+      const btn = h("button", {style: {border: "none", background: "none", padding: "2px 0",
+        fontSize: "11px", color: "var(--blue)", cursor: "pointer"}}, ["展开全部 ▾"]);
+      btn.addEventListener("click", () => {
+        const on = box.style.display !== "none";
+        box.style.display = on ? "none" : "block";
+        btn.textContent = on ? "展开全部 ▾" : "收起 ▴";
+      });
+      return [btn, box];
+    };
     const eventsCard = h("section", {class: "card", id: "events-card"}, [
       h("h3", {class: "card-title"}, ["本周数据及政策梳理"]),
       App.badge("manual_inputs/events.json"),
@@ -181,6 +195,7 @@ PANELS["fundamentals"] = {
               h("div", {style: {marginTop: "2px"}}, [ev.content || "—"]),
               ev.note ? h("div", {style: {marginTop: "2px", fontSize: "12px", color: "var(--muted)"}},
                 ["注：" + ev.note]) : null,
+              ...(ev.detail ? detailBlock(ev) : []),
             ])))
         : h("div", {class: "empty"}, ["待手工维护 manual_inputs/events.json"]),
     ]);
