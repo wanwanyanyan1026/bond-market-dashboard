@@ -648,8 +648,8 @@ function renderCredit() {
         + '<td style="color:' + (f.avg5 > 0 ? GRN : RED) + '">' + (f.avg5 > 0 ? "+" : "") + f.avg5.toFixed(2) + "</td></tr>";
     });
 
-    /* ⑧ 策略回测：本页独立「分位均值回归」（与量化页三因子 z-score 轮动相互独立） */
-    var ST = F.strategy || {}, tm = ST.timing || {}, ql = ST.quantile || {};
+    /* ⑧ 策略回测 v2：尾部动量过滤择时 + carry 赔率监测 + 截面五分位 tilt（与量化页三因子 z-score 轮动相互独立） */
+    var ST = F.strategy || {}, tm = ST.timing || {}, cy = ST.carry || {}, ql = ST.quantile || {};
     var ts = tm.stats || {}, tbh = tm.bh || {}, tsg = tm.signal || {};
     var tmRows = [["累计%", "cumPct"], ["年化%", "annPct"], ["最大回撤%", "mddPct"],
                   ["周胜率%", "winPct"], ["盈亏比", "pl"]].map(function (p) {
@@ -660,9 +660,24 @@ function renderCredit() {
     var tmAnnual = (tm.annual || []).map(function (a) {
       return a.year + "：" + a.stratPct + "/" + (a.bhPct == null ? "—" : a.bhPct) + "%";
     }).join(" · ");
+    var cyOddsTxt = cy.carryOdds == null ? "—"
+      : cy.carryOdds >= 1 ? "票息&gt;压缩风险，利差虽薄不宜机械减仓"
+      : "压缩风险&gt;票息，新增信用仓位谨慎";
+    var cyRows = [
+      ["当前利差", (cy.spreadBp == null ? "—" : cy.spreadBp + "bp") + "（全样本底 " + (cy.floorBp == null ? "—" : cy.floorBp)
+        + " / 中位 " + (cy.medBp == null ? "—" : cy.medBp) + "，滚动3Y分位 " + (cy.roll3yPct == null ? "—" : cy.roll3yPct + "%") + "）"],
+      ["carry 赔率", cy.carryOdds == null ? "—" : cy.carryOdds + "（1年票息 " + cy.spreadBp + "bp vs 再压缩最大市值损失 "
+        + cy.maxMtmLossBp + "bp）→ " + cyOddsTxt],
+      ["税后利差", cy.afterTaxBp == null ? "—" : cy.afterTaxBp + "bp（资管 3% 增值税，政金债利息免税）"],
+      ["套息空间", cy.sfCreditBp == null ? "—" : "AAA3Y−DR007 " + cy.sfCreditBp + "bp · 国开3Y−DR007 "
+        + cy.sfGovBp + "bp（DR007 近20日均值 " + cy.dr007 + "%）"],
+    ].map(function (p) {
+      return '<tr><td class="l">' + p[0] + "</td><td>" + p[1] + "</td></tr>";
+    }).join("");
     var qRows = (ql.groups || []).map(function (g) {
-      return '<tr><td class="l">' + g.g + "</td><td><b>" + g.meanBp + "</b></td><td>" + g.winPct
-        + "</td><td>" + (g.pl == null ? "—" : g.pl) + "</td></tr>";
+      return '<tr><td class="l">' + g.g + "</td><td><b>" + g.meanBp + "</b></td><td>"
+        + (g.netBp == null ? "—" : g.netBp) + "</td><td>" + (g.churnPct == null ? "—" : g.churnPct + "%")
+        + "</td><td>" + g.winPct + "</td><td>" + (g.pl == null ? "—" : g.pl) + "</td></tr>";
     }).join("");
     var q15 = ql.q1q5 || {};
     var qAnnual = (ql.annual || []).map(function (a) {
@@ -671,10 +686,11 @@ function renderCredit() {
     var stReady = ts.cumPct != null;
     /* 数据驱动判词：回测结论随数字走，不写死 */
     var tmVerdict = (ts.annPct == null || tbh.annPct == null) ? "—"
-      : ts.annPct >= tbh.annPct ? "择时跑赢买入持有"
-      : "择时未跑赢买入持有（利差中枢长期下行，滞回错过趋势段）";
+      : ts.annPct >= tbh.annPct
+      ? "尾部过滤跑赢买入持有（年化 " + ts.annPct + "% vs " + tbh.annPct + "%，MDD 持平）"
+      : "尾部过滤未跑赢买入持有";
     var xsVerdict = q15.meanBp == null ? "—" : q15.meanBp > 0
-      ? "截面排序 Q1 持续优于 Q5 —— 分位更适合「选品种」而非「择时」"
+      ? "截面排序有效：分位用于品种超配/低配（tilt）而非全仓轮动；Q2-Q4 中段组换手率≈70%，排序噪声大，实盘只做 Q1/Q5 两端"
       : "截面排序本窗口未见稳定优势";
 
     /* Carry（HPR 最近期） */
@@ -765,24 +781,31 @@ function renderCredit() {
       + '<div class="chartnote"><b>账户分层：</b>稳定负债（定开/配置）账户可持有 3-5Y AAA 吃票息；交易/通道账户久期≤3、杠杆中性，设利差 DV01 限额；退出条件=理财规模连续2周收缩或基金净买入20日转负。</div>'
       + '<div class="vfoot" style="margin:10px 0 0">方法论：ficc-credit-bond-strategy skill。数据经债市跟踪UI storage 管线落地，分位在各自可得历史内计算；自动生成，不构成投资建议。</div></div>'
       + (stReady
-        ? '<div class="card"><div class="card-title">⑧ 策略回测：分位均值回归 <span class="card-sub">本页独立策略 · ' + (ST.asOf || "—") + ' · expanding 分位（非前视，样本≥3年起）</span></div>'
+        ? '<div class="card"><div class="card-title">⑧ 策略回测：尾部动量过滤 + 五分位 tilt <span class="card-sub">本页独立策略 · ' + (ST.asOf || "—") + ' · 周五信号次周生效（非前视）</span></div>'
           + '<div class="grid grid-2">'
-          + '<div>择时：中票AAA3Y 利差分位 ≥70% 持信用 / ≤40% 切国开3Y（中间滞回，周五信号次周生效，切换 5bp）'
+          + '<div>择时：AAA3Y 利差单周走阔 &gt;10bp → 次周切国开3Y（两腿久期同为 2.8，纯利差腿切换）；走阔止住或 4 周后回信用，切换 10bp'
           + '<table class="ctbl" style="margin-top:6px"><thead><tr><th class="l">指标</th><th>策略</th><th>买入持有AAA3Y</th></tr></thead><tbody>'
           + tmRows + "</tbody></table>"
-          + '<div class="chartnote">当前信号：<b>' + (tsg.stateTxt || "—") + "</b>（分位 " + (tsg.pct == null ? "—" : tsg.pct + "%") + "，" + (tsg.date || "—")
-          + "）· " + (tm.start || "—") + " 起 " + (ts.nWeeks || 0) + " 周，切换 " + (tm.nSwitch || 0)
-          + " 次<br>分年 策略/持有：" + (tmAnnual || "—") + "</div></div>"
-          + '<div>截面五分位：每周五按 24 品种利差分位降序分 5 组（Q1=最便宜），非重叠持有 4 周'
-          + '<table class="ctbl" style="margin-top:6px"><thead><tr><th class="l">组</th><th>4周均值bp</th><th>胜率%</th><th>盈亏比</th></tr></thead><tbody>'
-          + (qRows || '<tr><td class="l" colspan="4">—</td></tr>') + "</tbody></table>"
-          + '<div class="chartnote">Q1−Q5：均值 <b>' + (q15.meanBp == null ? "—" : q15.meanBp + "bp/4周") + "</b> · 胜率 "
-          + (q15.winPct == null ? "—" : q15.winPct + "%") + " · 盈亏比 " + (q15.pl == null ? "—" : q15.pl)
-          + " · n=" + (ql.n || 0) + "<br>分年 Q1−Q5：" + (qAnnual || "—") + "</div></div>"
+          + '<div class="chartnote">当前信号：<b>' + (tsg.stateTxt || "—") + "</b>（" + (tsg.date || "—") + "，Δ利差 "
+          + (tsg.mom == null ? "—" : (tsg.mom > 0 ? "+" : "") + tsg.mom + "bp") + "）· 出场仅 "
+          + (tm.outPct == null ? "—" : tm.outPct + "%") + " 周期（" + (tm.outWeeks || 0) + " 周，累计贡献 +"
+          + (tm.outContribBp || 0) + "bp）· 切换 " + (tm.nSwitch || 0) + " 次"
+          + "<br>分年 策略/持有：" + (tmAnnual || "—") + "</div></div>"
+          + '<div>carry 赔率监测（决策支持，非交易信号）'
+          + '<table class="ctbl" style="margin-top:6px"><tbody>' + cyRows + "</tbody></table>"
+          + '<div class="chartnote">利差极薄时赔率倒挂（再压缩市值损失 &gt; 1 年票息），机械减仓反而亏 carry——用于加减仓节奏参考；两腿久期同为 2.8，本策略不做久期/绝对收益判断（久期观点见利率量化信号页）。</div></div>'
           + "</div>"
-          + '<div class="chartnote" style="margin:8px 0 0"><b>口径：</b>收益=票息−久期×ΔYTM 近似（3/5/7/10Y 久期 2.8/4.6/6.4/8.8），expanding 分位不含当期；'
-          + tmVerdict + "；" + xsVerdict + "。本策略独立于量化信号页「信用三因子 z-score 轮动」（2023 起年化 5.4%，见量化页）。自动生成，不构成投资建议。</div></div>"
-        : '<div class="card"><div class="card-title">⑧ 策略回测：分位均值回归 <span class="card-sub">本页独立策略</span></div><div class="empty">回测未就绪（ficc strategy 步失败或样本不足，下期自动恢复）</div></div>');
+          + '<div>截面五分位 tilt：各品种按自身滚动3Y利差分位排序，Q1=最便宜，非重叠持有 4 周（超配 Q1 / 低配 Q5）'
+          + '<table class="ctbl" style="margin-top:6px"><thead><tr><th class="l">组</th><th>4周毛bp</th><th>扣成本净bp</th><th>换手率</th><th>胜率%</th><th>盈亏比</th></tr></thead><tbody>'
+          + (qRows || '<tr><td class="l" colspan="6">—</td></tr>') + "</tbody></table>"
+          + '<div class="chartnote">Q1−Q5：毛 <b>' + (q15.meanBp == null ? "—" : q15.meanBp + "bp/4周") + "</b> → 净 "
+          + (q15.netBp == null ? "—" : "<b>" + q15.netBp + "bp/4周</b>") + "（" + (q15.churnNote || "—")
+          + "）· 胜率 " + (q15.winPct == null ? "—" : q15.winPct + "%") + " · 盈亏比 " + (q15.pl == null ? "—" : q15.pl)
+          + " · n=" + (ql.n || 0) + "<br>分年 Q1−Q5（毛）：" + (qAnnual || "—") + "</div></div>"
+          + '<div class="chartnote" style="margin:8px 0 0"><b>口径：</b>收益=票息−久期×ΔYTM 近似（3/5/7/10Y 久期 2.8/4.6/6.4/8.8），估值收益率；择时切换成本 10bp（20bp 仍跑赢），截面净额=毛−2×换手率×5bp（单边，保守）。'
+          + tmVerdict + "；" + xsVerdict + "。<b>实盘要点：</b>周五收盘信号周一执行；出场周仅 " + (tm.outWeeks || 0)
+          + " 个，收益由少数利差走阔事件（2020-04、2022-11 赎回潮）主导，属尾部避险而非每周增强；v1 分位均值回归择时经全参数组验证跑输已弃用（分位降级为监测指标）。本策略独立于量化信号页「信用三因子 z-score 轮动」（2023 起年化 5.4%，见量化页）。自动生成，不构成投资建议。</div></div>"
+        : '<div class="card"><div class="card-title">⑧ 策略回测：尾部动量过滤 + 五分位 tilt <span class="card-sub">本页独立策略</span></div><div class="empty">回测未就绪（ficc strategy 步失败或样本不足，下期自动恢复）</div></div>');
 
     /* 利差分位条形图（24 品种 = 3Y 全评级 + 5/7/10Y 长端，红<10% / 琥珀<30% / 绿≥30%）；
        条数翻倍 → 容器高度按品种数动态撑开（CSS 固定 430px 仅兜底） */
