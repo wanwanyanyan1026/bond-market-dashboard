@@ -1,7 +1,12 @@
 /* ============================================================
-   panels/value.js — 相对价值（Phase B Task 7）
-   六卡（消费 data.js value 段，Task 6 派生）：
-     ① 期限利差——10Y-1Y / 30Y-1Y 双线同轴 bp；副标题当前值 + 3年分位
+   panels/value.js — 相对价值（Phase B Task 7 → 2026-10-23 三 tab 分组）
+   六卡按比较对象分三 tab（参照华泰债市相对价值面板，全卡保留）：
+     tab1 利率债利差：① 期限利差——国债/国开 × 1/5/10/30Y 期限对 chips 多选
+        （默认 10Y-1Y/30Y-1Y 双线同轴 bp；副标题当前值 + 3年分位）② 国开-国债
+     tab2 股债比价：③ 股债性价比（ERP）⑤ 股息率 vs 国债（保险比价）
+     tab3 贷款·租金比价：⑥ 贷款 vs 国债（银行比价·EVA）④ 贷款与租金 vs 10Y
+   品种/等级维度归「利差跟踪」面板（8 品种×评级×期限 tab）——tab 栏尾部入口；
+   隐藏 pane 内 echarts.init 取 0 尺寸 → 激活时才绘制该组图（spread.js 双分页同款）
      ② 国开-国债——利差线 + 隐含税率线同卡两图（超储卡先例：单位不同
         各自单轴，禁双轴）；tax 无 pct3y（数据侧未派生）→ 副标题不显示分位
      ③ 股债性价比——ERP 线 + 副标题当前值/3年分位（与资产面板比价卡
@@ -36,21 +41,42 @@ PANELS["value"] = {
     const pctTxt = (s) => (!s || !Array.isArray(s.dates) || s.dates.length <= 3) ? ""
       : "（3年分位 " + App.fmt(lastNum(s.pct3y), 1) + "）";
 
-    /* —— ① 期限利差：双线同轴 bp —— */
+    /* —— ① 期限利差：期限对 chips 多选（2026-10-23 参照华泰可选指标），默认
+       国债10Y-1Y+国债30Y-1Y；勾选交互同 spread.js ⓪ 卡（.chip on + 灰显，至少留 1 对）—— */
     const TS = V.termSpreads || {};
     const tsSeries = Object.entries(TS)
       .filter(([, s]) => s && Array.isArray(s.dates) && s.dates.length && has(s.values))
       .map(([name, s]) => ({name, dates: s.dates, values: s.values, src: s}));
-    const tsSub = tsSeries.map((s) =>
-      s.name + " 当前 " + App.fmt(lastNum(s.src.values), 2) + "bp" + pctTxt(s.src)).join(" · ");
+    const TS_DEFAULT = ["国债10Y-1Y", "国债30Y-1Y"];
+    const tsSel = new Set(tsSeries.filter((s) => TS_DEFAULT.includes(s.name)).map((s) => s.name));
+    if (!tsSel.size && tsSeries.length) tsSel.add(tsSeries[0].name);  // 默认对缺失回退首键
     const tsBox = h("div", {id: "value-term-chart", class: "chart"});
+    const tsSubEl = h("p", {class: "card-sub"}, []);
+    const tsSubText = () => tsSeries.filter((s) => tsSel.has(s.name)).map((s) =>
+      s.name + " 当前 " + App.fmt(lastNum(s.src.values), 2) + "bp" + pctTxt(s.src)).join(" · ");
+    function redrawTerm() {
+      tsSubEl.textContent = tsSeries.length
+        ? tsSubText() + "（滚动 3 年百分位，窗口不足回退全史）"
+        : "国债曲线期限结构待接入";
+      if (tsSel.size) Charts.line(tsBox, {series: tsSeries.filter((s) => tsSel.has(s.name)),
+        yUnit: "bp", range: "3Y"});
+    }
+    const tsChips = h("div", {style: {display: "flex", flexWrap: "wrap", gap: "6px", margin: "0 0 10px"}},
+      tsSeries.map((s) => h("button", {
+        class: "chip" + (tsSel.has(s.name) ? " on" : ""),
+        style: tsSel.has(s.name) ? {} : {opacity: "0.45"},
+        onclick: (e) => {
+          if (tsSel.has(s.name) && tsSel.size === 1) return;      // 至少留 1 对
+          tsSel.has(s.name) ? tsSel.delete(s.name) : tsSel.add(s.name);
+          e.currentTarget.classList.toggle("on", tsSel.has(s.name));
+          e.currentTarget.style.opacity = tsSel.has(s.name) ? "" : "0.45";
+          redrawTerm();
+        }}, [s.name])));
     const termCard = h("section", {class: "card", id: "value-term-card"}, [
-      h("h3", {class: "card-title"}, ["期限利差（国债曲线）"]),
-      App.badge("自建存储 · 国债曲线派生", fetchedAt),
-      h("p", {class: "card-sub"}, [tsSeries.length
-        ? tsSub + "（滚动 3 年百分位，窗口不足回退全史）"
-        : "国债曲线期限结构待接入"]),
-      tsSeries.length ? tsBox
+      h("h3", {class: "card-title"}, ["期限利差（国债/国开曲线，可选期限对）"]),
+      App.badge("自建存储 · 国债/国开曲线派生", fetchedAt),
+      tsSubEl,
+      tsSeries.length ? [tsChips, tsBox]
         : h("div", {class: "empty"}, ["期限利差数据待接入（python scripts/update.py --only value）"]),
     ]);
 
@@ -203,32 +229,63 @@ PANELS["value"] = {
       ] : h("div", {class: "empty"}, ["一般贷款利率待接入（python scripts/update.py --only value）"]),
     ]);
 
-    /* 组装后统一绘制（echarts.init 需容器在文档中取非零宽高）：
-       期限利差全幅，国开-国债+股债性价比两列并排，
-       保险比价/银行EVA比价/贷款与租金（跨 2009-2026）全幅 */
+    /* —— 组装：三 tab 分组（2026-10-23 参照华泰面板按比较对象分组，六卡全保留）。
+       echarts.init 需容器在文档中取非零宽高 → 隐藏 pane 不绘制，激活时调该组
+       draw；Charts.line 同 el 先 dispose 再 init，重复激活重绘无残留 —— */
+    const groups = [
+      {label: "利率债利差", hint: "期限利差（可选期限对）+ 国开-国债利差与隐含税率",
+       cards: [termCard, cdbCard],
+       draw: () => {
+         redrawTerm();
+         if (cdbOk) Charts.line(cdbBox, {series: [
+           {name: "国开-国债利差", dates: cdbDates, values: C.values}], yUnit: "bp", range: "3Y"});
+         if (taxOk) Charts.line(taxBox, {series: [
+           {name: "隐含税率", dates: cdbDates, values: C.tax}], yUnit: "%", range: "3Y"});
+       }},
+      {label: "股债比价", hint: "股债性价比（ERP）+ 股息率 vs 国债收益率（保险比价）",
+       cards: [ebCard, dyCard],
+       draw: () => {
+         if (ebOk) Charts.line(ebBox, {series: [
+           {name: "ERP", dates: EB.dates, values: EB.values}], yUnit: EB.unit || "%", range: "3Y"});
+         if (dvLevel.length) Charts.line(dvLvBox, {series: dvLevel, yUnit: "%", range: "ALL"});
+         if (dvSpread.length) Charts.line(dvSpBox, {series: dvSpread, yUnit: "bp", range: "ALL",
+           markLine: {symbol: "none", silent: true,
+                      label: {formatter: "200bp 参考线", position: "insideEndTop", fontSize: 10, color: "#999"},
+                      lineStyle: {type: "dashed", width: 1, color: "#999"},
+                      data: [{yAxis: 200}]}});
+       }},
+      {label: "贷款·租金比价", hint: "贷款 vs 国债收益率（银行比价·EVA口径）+ 贷款与租金 vs 10Y 国债",
+       cards: [evaCard, loanCard],
+       draw: () => {
+         if (leLevel.length) Charts.line(leLvBox, {series: leLevel, yUnit: "%", range: "ALL"});
+         if (leSpread.length) Charts.line(leSpBox, {series: leSpread, yUnit: "bp", range: "ALL",
+           markLine: {symbol: "none", silent: true,
+                      label: {formatter: "0 贷债平衡线", position: "insideEndTop", fontSize: 10, color: "#999"},
+                      lineStyle: {type: "dashed", width: 1, color: "#999"},
+                      data: [{yAxis: 0}]}});
+         if (lbLevel.length) Charts.line(lvBox, {series: lbLevel, yUnit: "%", range: "ALL"});
+         if (lbSpread.length) Charts.line(spBox, {series: lbSpread, yUnit: "bp", range: "ALL"});
+       }},
+    ];
+    const paneTabs = h("div", {class: "tabs", id: "value-pane-tabs"});
+    const panes = groups.map(() => h("div", {style: {display: "none"}}));
+    function showPane(i) {
+      paneTabs.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", +b.dataset.g === i));
+      panes.forEach((p, j) => (p.style.display = j === i ? "" : "none"));
+      groups[i].draw();
+    }
+    groups.forEach((g, i) => {
+      paneTabs.append(h("button", {class: "tab", "data-g": i, title: g.hint,
+        onclick: () => showPane(i)}, [g.label]));
+      panes[i].append(...g.cards);
+    });
     root.append(Export.btn("value"));
-    root.append(termCard, h("div", {class: "grid grid-2"}, [cdbCard, ebCard]), dyCard, evaCard, loanCard);
-
-    if (tsSeries.length) Charts.line(tsBox, {series: tsSeries, yUnit: "bp", range: "3Y"});
-    if (cdbOk) Charts.line(cdbBox, {series: [
-      {name: "国开-国债利差", dates: cdbDates, values: C.values}], yUnit: "bp", range: "3Y"});
-    if (taxOk) Charts.line(taxBox, {series: [
-      {name: "隐含税率", dates: cdbDates, values: C.tax}], yUnit: "%", range: "3Y"});
-    if (ebOk) Charts.line(ebBox, {series: [
-      {name: "ERP", dates: EB.dates, values: EB.values}], yUnit: EB.unit || "%", range: "3Y"});
-    if (lbLevel.length) Charts.line(lvBox, {series: lbLevel, yUnit: "%", range: "ALL"});
-    if (lbSpread.length) Charts.line(spBox, {series: lbSpread, yUnit: "bp", range: "ALL"});
-    if (dvLevel.length) Charts.line(dvLvBox, {series: dvLevel, yUnit: "%", range: "ALL"});
-    if (dvSpread.length) Charts.line(dvSpBox, {series: dvSpread, yUnit: "bp", range: "ALL",
-      markLine: {symbol: "none", silent: true,
-                 label: {formatter: "200bp 参考线", position: "insideEndTop", fontSize: 10, color: "#999"},
-                 lineStyle: {type: "dashed", width: 1, color: "#999"},
-                 data: [{yAxis: 200}]}});
-    if (leLevel.length) Charts.line(leLvBox, {series: leLevel, yUnit: "%", range: "ALL"});
-    if (leSpread.length) Charts.line(leSpBox, {series: leSpread, yUnit: "bp", range: "ALL",
-      markLine: {symbol: "none", silent: true,
-                 label: {formatter: "0 贷债平衡线", position: "insideEndTop", fontSize: 10, color: "#999"},
-                 lineStyle: {type: "dashed", width: 1, color: "#999"},
-                 data: [{yAxis: 0}]}});
+    root.append(paneTabs, ...panes);
+    /* 品种/等级维度归「利差跟踪」面板（8 品种×评级档×期限 tab 专卡）——tab 栏
+       尾部跳转入口；variety.html 总览页无 App.show（shim 子集），不显示 */
+    if (typeof App.show === "function") paneTabs.append(
+      h("button", {class: "chip", style: {marginLeft: "auto", alignSelf: "center"},
+        onclick: () => App.show("spread")}, ["品种·等级利差 →"]));
+    showPane(0);
   },
 };

@@ -655,17 +655,22 @@ function renderCredit() {
 
     /* ⑧ 策略回测 v2：尾部动量过滤择时 + carry 赔率监测 + 截面五分位 tilt（与量化页三因子 z-score 轮动相互独立） */
     var ST = F.strategy || {}, tm = ST.timing || {}, cy = ST.carry || {}, ql = ST.quantile || {};
-    var ts = tm.stats || {}, tbh = tm.bh || {}, tsg = tm.signal || {};
+    var ts = tm.stats || {}, tbh = tm.bh || {}, tsg = tm.signal || {}, tb2 = tm.bhB || {}, tbl = tm.blend || {};
     var tmRows = [["累计%", "cumPct"], ["年化%", "annPct"], ["最大回撤%", "mddPct"],
                   ["周胜率%", "winPct"], ["盈亏比", "pl"]].map(function (p) {
-      var a = ts[p[1]], b = tbh[p[1]];
+      var a = ts[p[1]], b = tbh[p[1]], c = tb2[p[1]], d = tbl[p[1]];
       return '<tr><td class="l">' + p[0] + "</td><td><b>" + (a == null ? "—" : a) + "</b></td>"
-        + "<td>" + (b == null ? "—" : b) + "</td></tr>";
+        + "<td>" + (b == null ? "—" : b) + "</td><td>" + (c == null ? "—" : c) + "</td>"
+        + "<td>" + (d == null ? "—" : d) + "</td></tr>";
     }).join("");
     var tmAnnual = (tm.annual || []).map(function (a) {
       return a.year + "：" + a.stratPct + "/" + (a.bhPct == null ? "—" : a.bhPct) + "%"
         + (a.outWk ? "（出场" + a.outWk + "周）" : "");
     }).join(" · ");
+    var tmEpTxt = (tm.episodes || []).map(function (e) {
+      return e.start.slice(0, 7) + (e.weeks > 1 ? "×" + e.weeks + "周" : "") + "（" + (e.bp > 0 ? "+" : "") + e.bp + "bp）";
+    }).join("、");
+    var tmLastEp = tm.episodes && tm.episodes.length ? tm.episodes[tm.episodes.length - 1].end : null;
     var cyOddsTxt = cy.carryOdds == null ? "—"
       : cy.carryOdds >= 1 ? "票息&gt;压缩风险，利差虽薄不宜机械减仓"
       : "压缩风险&gt;票息，新增信用仓位谨慎";
@@ -683,20 +688,24 @@ function renderCredit() {
     var qRows = (ql.groups || []).map(function (g) {
       return '<tr><td class="l">' + g.g + "</td><td><b>" + g.meanBp + "</b></td><td>"
         + (g.netBp == null ? "—" : g.netBp) + "</td><td>" + (g.churnPct == null ? "—" : g.churnPct + "%")
-        + "</td><td>" + g.winPct + "</td><td>" + (g.pl == null ? "—" : g.pl) + "</td></tr>";
+        + "</td><td>" + (g.dur == null ? "—" : g.dur) + "</td><td>" + g.winPct + "</td><td>"
+        + (g.pl == null ? "—" : g.pl) + "</td></tr>";
     }).join("");
     var q15 = ql.q1q5 || {};
     var qAnnual = (ql.annual || []).map(function (a) {
       return a.year + "：" + (a.diffBp > 0 ? "+" : "") + a.diffBp + "bp";
     }).join(" · ");
+    var qPosYears = (ql.annual || []).filter(function (a) { return a.diffBp > 0; }).length;
     var stReady = ts.cumPct != null;
     /* 数据驱动判词：回测结论随数字走，不写死 */
     var tmVerdict = (ts.annPct == null || tbh.annPct == null) ? "—"
       : ts.annPct >= tbh.annPct
-      ? "尾部过滤跑赢买入持有（年化 " + ts.annPct + "% vs " + tbh.annPct + "%，MDD 持平）"
+      ? "尾部过滤跑赢全部静态基准（年化 " + ts.annPct + "% vs 持有信用 " + tbh.annPct + "% / 国开 "
+        + (tb2.annPct == null ? "—" : tb2.annPct) + "% / 50-50 " + (tbl.annPct == null ? "—" : tbl.annPct) + "%）"
       : "尾部过滤未跑赢买入持有";
     var xsVerdict = q15.meanBp == null ? "—" : q15.meanBp > 0
-      ? "截面排序有效：分位用于品种超配/低配（tilt）而非全仓轮动；Q2-Q4 中段组换手率≈70%，排序噪声大，实盘只做 Q1/Q5 两端"
+      ? "截面排序有效（久期对冲后 " + qPosYears + "/" + (ql.annual || []).length + " 年为正"
+        + (q15.tStat == null ? "" : "，t=" + q15.tStat) + "）：分位用于品种超配/低配（tilt）而非全仓轮动；Q2-Q4 中段组区分度弱，实盘只做 Q1/Q5 两端"
       : "截面排序本窗口未见稳定优势";
     /* 策略建议三卡（复用 scencard 样式，绿=持有/红=避险）：每模块「结论 → 读数 → 动作」，数据驱动不写死 */
     var momTxt = tsg.mom == null ? "—" : (tsg.mom > 0 ? "+" : "") + tsg.mom + "bp";
@@ -721,11 +730,13 @@ function renderCredit() {
          desc: "赔率 " + cy.carryOdds + " 倒挂：再压缩最大损失 " + cy.maxMtmLossBp + "bp &gt; 1 年票息 " + cy.spreadBp + "bp",
          act: "新增仓位谨慎，优先兑现浮盈" + cySf};
     var qc = ql.cur || {};
+    var qlDurTxt = qc.q1Dur == null ? "" : "；两组平均久期 " + qc.q1Dur + " / " + qc.q5Dur
+      + " 年（差 " + (qc.q1Dur - qc.q5Dur).toFixed(1) + "），久期敞口由利率仓统一管理";
     var qlCard = qc.q1
       ? {cls: "", t: "截面｜超配 Q1 · 低配 Q5",
          desc: "Q1（自身3Y分位最高＝最便宜）：" + qc.q1.map(disp).join("、")
            + "<br>Q5（最贵）：" + qc.q5.map(disp).join("、") + "（" + qc.date + " 截面）",
-         act: "做品种超配/低配 tilt（4 周一换，单边 5bp），非全仓轮动；Q1 常集中二永/长端，注意流动性"}
+         act: "做品种超配/低配 tilt（4 周一换，单边 5bp），非全仓轮动；Q1 常集中二永/长端，注意流动性" + qlDurTxt}
       : {cls: "", t: "截面｜当前截面未就绪", desc: "—", act: "—"};
     var advHtml = '<div class="scenrow" style="margin:6px 0 2px">' + [tmCard, cyCard, qlCard].map(function (s) {
       return '<div class="scencard ' + s.cls + '"><div class="t" style="font-size:13px">' + s.t + "</div>"
@@ -776,27 +787,38 @@ function renderCredit() {
     var stCard = stReady
       ? '<div class="card"><div class="card-title">⑧ 信用债策略建议 <span class="card-sub">独立回测策略 · 数据截至 ' + (ST.asOf || "—") + ' · 周五信号次周生效（非前视）</span></div>'
         + advHtml
-        + '<div class="chartnote" style="margin:2px 0 0"><b>如何运用（每周五收盘看三个数）：</b>① <b>择时</b>｜AAA3Y 利差单周 Δ：&gt;+10bp → 下周一信用仓切国开3Y（两腿久期同 2.8，纯利差腿，不做久期判断，久期观点见利率量化信号页）；Δ≤0 或出场满 4 周切回，切换成本按 10bp。② <b>carry</b>｜赔率、税后利差、AAA3Y−DR007 套息：赔率 ≥1 不机械减仓、&lt;1 新增仓位谨慎；套息为负时杠杆端先撤。③ <b>截面</b>｜各品种滚动3Y分位排序：超配 Q1（最便宜）、低配 Q5（最贵），非重叠 4 周一换（单边 5bp），Q1 常集中二永/城投需流动性约束。执行一律周五信号、周一操作。</div>'
+        + '<div class="chartnote" style="margin:2px 0 0"><b>如何运用（每周五收盘看三个数）：</b>① <b>择时</b>｜AAA3Y 利差单周 Δ：&gt;+10bp → 下周一信用仓切国开3Y（两腿久期同 2.8，纯利差腿，不做久期判断，久期观点见利率量化信号页）；Δ≤0 或出场满 4 周切回，切换成本按 10bp。② <b>carry</b>｜赔率、税后利差、AAA3Y−DR007 套息：赔率 ≥1 不机械减仓、&lt;1 新增仓位谨慎；套息为负时杠杆端先撤。③ <b>截面</b>｜各品种滚动3Y分位排序：超配 Q1（最便宜）、低配 Q5（最贵），非重叠 4 周一换（单边 5bp），Q1 常集中二永/城投需流动性约束；收益与回测均为久期对冲口径（品种−同期限国开），久期敞口由利率仓统一管理。执行一律周五信号、周一操作。</div>'
         + '<details style="margin-top:6px"><summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--v-muted)">回测证据与口径（点击展开）</summary>'
         + '<div class="grid grid-2" style="margin-top:6px">'
         + '<div>择时（尾部动量过滤）：AAA3Y 利差单周走阔 &gt;10bp → 次周切国开3Y（纯利差腿切换）；走阔止住或 4 周后回信用，切换 10bp'
-        + '<table class="ctbl" style="margin-top:6px"><thead><tr><th class="l">指标</th><th>策略</th><th>买入持有AAA3Y</th></tr></thead><tbody>'
+        + '<table class="ctbl" style="margin-top:6px"><thead><tr><th class="l">指标</th><th>策略</th><th>买入持有AAA3Y</th><th>持有国开3Y</th><th>50/50静态</th></tr></thead><tbody>'
         + tmRows + "</tbody></table>"
         + '<div class="chartnote">当前信号：<b>' + (tsg.stateTxt || "—") + "</b>（" + (tsg.date || "—") + "，Δ利差 "
         + momTxt + "）· 出场仅 " + (tm.outPct == null ? "—" : tm.outPct + "%") + " 周期（" + (tm.outWeeks || 0) + " 周，累计贡献 +"
-        + (tm.outContribBp || 0) + "bp）· 切换 " + (tm.nSwitch || 0) + " 次<br>分年 策略/持有：" + (tmAnnual || "—") + "</div></div>"
+        + (tm.outContribBp || 0) + "bp）· 切换 " + (tm.nSwitch || 0) + "次 · 周超额年化 +" + (tm.excessAnnBp == null ? "—" : tm.excessAnnBp + "bp")
+        + (tm.excessT == null ? "" : "（t=" + tm.excessT + "，事件驱动样本仅边际显著）")
+        + "<br>出场 " + ((tm.episodes || []).length) + " 段：" + (tmEpTxt || "—")
+        + (tmLastEp && tsg.state == 1 ? "——" + tmLastEp + " 后零触发" : "")
+        + "<br>分年 策略/持有：" + (tmAnnual || "—") + "</div></div>"
         + '<div>carry 赔率监测（决策支持，非交易信号）'
         + '<table class="ctbl" style="margin-top:6px"><tbody>' + cyRows + "</tbody></table>"
         + '<div class="chartnote">利差极薄时赔率倒挂（再压缩市值损失 &gt; 1 年票息），机械减仓反而亏 carry；两腿久期同为 2.8，本策略不做久期判断（久期观点见利率量化信号页）。</div></div>'
         + "</div>"
-        + '<div>截面五分位 tilt：各品种按自身滚动3Y利差分位排序，Q1=最便宜，非重叠持有 4 周（超配 Q1 / 低配 Q5）'
-        + '<table class="ctbl" style="margin-top:6px"><thead><tr><th class="l">组</th><th>4周毛bp</th><th>扣成本净bp</th><th>换手率</th><th>胜率%</th><th>盈亏比</th></tr></thead><tbody>'
-        + (qRows || '<tr><td class="l" colspan="6">—</td></tr>') + "</tbody></table>"
-        + '<div class="chartnote">Q1−Q5：毛 <b>' + (q15.meanBp == null ? "—" : q15.meanBp + "bp/4周") + "</b> → 净 "
+        + '<div>截面五分位 tilt：各品种按自身滚动3Y利差分位排序，Q1=最便宜，非重叠持有 4 周（超配 Q1 / 低配 Q5）；收益为<b>久期对冲口径</b>（品种−同期限国开，纯利差腿）'
+        + '<table class="ctbl" style="margin-top:6px"><thead><tr><th class="l">组</th><th>4周毛bp</th><th>扣成本净bp</th><th>换手率</th><th>平均久期</th><th>胜率%</th><th>盈亏比</th></tr></thead><tbody>'
+        + (qRows || '<tr><td class="l" colspan="7">—</td></tr>') + "</tbody></table>"
+        + '<div class="chartnote">对冲口径 Q1−Q5：毛 <b>' + (q15.meanBp == null ? "—" : q15.meanBp + "bp/4周") + "</b> → 净 "
         + (q15.netBp == null ? "—" : "<b>" + q15.netBp + "bp/4周</b>") + "（" + (q15.churnNote || "—")
         + "）· 胜率 " + (q15.winPct == null ? "—" : q15.winPct + "%") + " · 盈亏比 " + (q15.pl == null ? "—" : q15.pl)
-        + " · n=" + (ql.n || 0) + "<br>分年 Q1−Q5（毛）：" + (qAnnual || "—") + "</div></div>"
-        + '<div class="chartnote" style="margin:8px 0 0"><b>口径：</b>仓位为品种曲线常期限代理（非个券组合）：择时=100%中票AAA3Y⇄100%国开3Y 全仓切换；截面 Q1/Q5=等权品种篮子。收益=票息−久期×ΔYTM 近似（3/5/7/10Y 久期 2.8/4.6/6.4/8.8），估值收益率；择时切换成本 10bp（20bp 仍跑赢），截面净额=毛−2×换手率×5bp（单边，保守）。回测衡量信号区分度，实盘仓位由投资经理落地。'
+        + (q15.tStat == null ? "" : " · t=" + q15.tStat) + " · n=" + (ql.n || 0)
+        + "<br>分解：利差收敛 " + (q15.convBp == null ? "—" : q15.convBp + "bp") + " + 利差票息差 "
+        + (q15.carryBp == null ? "—" : q15.carryBp + "bp") + "（超额≈全部来自便宜品种利差收敛，非票息差）"
+        + "；未对冲口径（含利率腿污染）：毛 " + (q15.unhedgedMeanBp == null ? "—" : q15.unhedgedMeanBp) + " → 净 "
+        + (q15.unhedgedNetBp == null ? "—" : q15.unhedgedNetBp + "bp")
+        + (qc.q1Dur == null ? "" : "<br>当前截面平均久期 Q1 " + qc.q1Dur + " / Q5 " + qc.q5Dur + " 年（差 "
+          + (qc.q1Dur - qc.q5Dur).toFixed(1) + "），未对冲时 Q1 多扛的久期由利率行情主导")
+        + "<br>分年 Q1−Q5（对冲）：" + (qAnnual || "—") + "</div></div>"
+        + '<div class="chartnote" style="margin:8px 0 0"><b>口径：</b>仓位为品种曲线常期限代理（非个券组合）：择时=100%中票AAA3Y⇄100%国开3Y 全仓切换；截面 Q1/Q5=等权品种篮子，收益=品种−同期限国开（久期中性纯利差腿，未对冲口径作参考）。收益=票息−久期×ΔYTM 近似（3/5/7/10Y 久期 2.8/4.6/6.4/8.8），估值收益率有平滑滞后，收敛型超额实盘可得低于回测；择时切换成本 10bp（20bp 仍跑赢），截面净额=毛−2×换手率×5bp（单边加倍至 10bp 仍为正）。回测衡量信号区分度，实盘仓位与久期对冲由投资经理落地。'
         + tmVerdict + "；" + xsVerdict + "。<b>实盘要点：</b>周五收盘信号周一执行；出场周仅 " + (tm.outWeeks || 0)
         + " 个，收益由少数利差走阔事件（2020-04、2022-11 赎回潮）主导，属尾部避险而非每周增强；分位仅作监测与截面排序，不作择时信号。本策略独立于量化信号页「信用三因子 z-score 轮动」（2023 起年化 5.4%，见量化页）。自动生成，不构成投资建议。</div>"
         + "</details></div>"
@@ -878,7 +900,7 @@ function renderCredit() {
     requestAnimationFrame(function () { credCharts.forEach(function (c) { c.resize(); }); });
   });
 }
-window.__DATA_V__ = "variety-2026-10-23.0940"; /* build_data 构建时改写：data.js 为 immutable 长缓存，同日重建必须换键 */
+window.__DATA_V__ = "variety-2026-10-23.2143"; /* build_data 构建时改写：data.js 为 immutable 长缓存，同日重建必须换键 */
 (function () {
   var v = window.__DATA_V__ || ("variety-" + new Date().toISOString().slice(0, 10).replace(/-/g, ""));
   var s = document.createElement("script");
