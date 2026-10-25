@@ -44,6 +44,7 @@ const App = {
     liquidity: ["liquidity"],
     industry: ["industry"],
     spread: ["spread"],
+    value: ["spread"],   // 相对价值 tab4「期限·品种·新老券」消费 spread 段（曲线水平/信用利差序列）
     quant: ["ficc"],   // 量化信号面板：8191子集择时卡组
   },
   _secPromises: {},

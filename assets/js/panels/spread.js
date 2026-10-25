@@ -287,12 +287,74 @@ PANELS["spread"] = {
         : h("div", {class: "empty"}, ["品种明细待接入（python scripts/update.py --only spread）"]),
     ]);
 
-    /* 组装后统一绘制（echarts.init 需容器在文档中取非零宽高）：全部卡最顶、银行资本债改全幅单卡 */
-    root.append(Export.btn("spread"));
-    root.append(snapCard, allCard, detailCard, bankCard, bankmtnCard);
+    /* —— ⓪' 当日利差总览（2026-10-25，参照华泰面板）：130 项快照按段分组，
+       较前日/近5日变动 + 近3年 P25/P50/P75 + 当前分位（Charts.table 纯 DOM，
+       无 echarts，构建期即画）—— */
+    function dayTable(gi) {
+      const rows = snapRows.filter((r) => seg(r.name) === gi);
+      if (!rows.length) return null;
+      const box = h("div", {id: "spread-day-table-" + gi});
+      const trs = Charts.table(box, {
+        columns: [{key: "k0", label: "指标"}, {key: "k1", label: "当前", num: true},
+                  {key: "k2", label: "较前日", num: true}, {key: "k3", label: "近5日", num: true},
+                  {key: "k4", label: "近3年 P25/P50/P75"}, {key: "k5", label: "当前分位", num: true}],
+        rows: rows.map((r) => ({
+          k0: r.name,
+          k1: r.unit === "%" ? App.fmt(r.curr, 2) + "%" : App.fmt(r.curr, 2),
+          k2: r.chg1d === null ? "—" : (r.chg1d > 0 ? "+" : "") + App.fmt(r.chg1d, 2),
+          k3: r.chg5d === null ? "—" : (r.chg5d > 0 ? "+" : "") + App.fmt(r.chg5d, 2),
+          k4: r.p25 === null ? "—" : [r.p25, r.p50, r.p75].map((p) => App.fmt(p, 1)).join(" / "),
+          k5: r.pct3y === null ? "—" : App.fmt(r.pct3y, 1),
+        })),
+      });
+      trs.forEach((tr, i) => {   // 较前日列着色（正红/负绿/零灰，同快照表惯例）
+        const v = rows[i].chg1d;
+        if (num(v)) tr.children[2].replaceChildren(
+          h("span", {class: v > 0 ? "up" : v < 0 ? "down" : "flat"},
+            [(v > 0 ? "+" : "") + App.fmt(v, 2) + "bp"]));
+      });
+      return [h("div", {style: {margin: "10px 0 2px", fontSize: "13px",
+                                color: "var(--muted)"}}, [SEG_TITLES[gi]]), box];
+    }
+    const dayKids = SEG_TITLES.map((_, gi) => dayTable(gi)).filter(Boolean);
+    const dayCard = h("section", {class: "card", id: "spread-day-card"}, [
+      h("h3", {class: "card-title"}, ["当日利差总览（" + snapRows.length + " 项）"]),
+      App.badge(BADGE, fetchedAt),
+      h("p", {class: "card-sub"}, [snapRows.length
+        ? "截至 " + snap.asOf + " · 较前日/近5日变动（bp）与近 3 年 P25/P50/P75（窗口值分布，水平位置感）"
+          + " · 当前分位=近 3 年滚动百分位 · 收益率行当前值 %、变动一律 bp"
+        : "快照数据待接入"]),
+      dayKids.length ? h("div", {class: "grid grid-2"}, [h("div", {}, dayKids.slice(0, 4)), h("div", {}, dayKids.slice(4))])
+        : h("div", {class: "empty"}, ["利差快照数据待接入"]),
+    ]);
 
-    if (variety.length) { redrawAll(); drawDetail(variety[0].name); }
-    if (bankSeries.length) drawBank("AAA-");
-    if (mtnSeries.length) drawBankmtn("AAA-");
+    /* —— 面板级双 tab（2026-10-25）：当日利差总览 / 序列与周度明细（原五卡）。
+       seq pane 含 echarts → 激活时才绘制（隐藏期 init 取 0 尺寸，value.js tab 同款）；
+       重进 dispatch resize 修正隐藏期间窗口变化 —— */
+    const seqWrap = h("div", {id: "spread-pane-seq", style: {display: "none"}},
+      [snapCard, allCard, detailCard, bankCard, bankmtnCard]);
+    const dayWrap = h("div", {id: "spread-pane-day"}, [dayCard]);
+    const paneTabs = h("div", {class: "tabs", id: "spread-pane-tabs"}, [
+      h("button", {class: "tab active", "data-g": "0", onclick: () => showPane(0)}, ["当日利差总览"]),
+      h("button", {class: "tab", "data-g": "1", onclick: () => showPane(1)}, ["序列与周度明细"]),
+    ]);
+    let seqDrawn = false;
+    function showPane(i) {
+      paneTabs.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", +b.dataset.g === i));
+      dayWrap.style.display = i === 0 ? "" : "none";
+      seqWrap.style.display = i === 1 ? "" : "none";
+      if (i === 1) {
+        if (!seqDrawn) {
+          seqDrawn = true;
+          if (variety.length) { redrawAll(); drawDetail(variety[0].name); }
+          if (bankSeries.length) drawBank("AAA-");
+          if (mtnSeries.length) drawBankmtn("AAA-");
+        } else {
+          window.dispatchEvent(new Event("resize"));
+        }
+      }
+    }
+    root.append(Export.btn("spread"));
+    root.append(paneTabs, dayWrap, seqWrap);
   },
 };

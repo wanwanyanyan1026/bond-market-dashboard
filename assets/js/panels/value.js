@@ -6,6 +6,10 @@
      tab2 股债比价：③ 股债性价比（ERP）⑤ 股息率 vs 国债（保险比价）
      tab3 贷款·租金比价：⑥ 贷款 vs 国债（银行比价·EVA）④ 贷款与租金 vs 10Y
    品种/等级维度归「利差跟踪」面板（8 品种×评级×期限 tab）——tab 栏尾部入口；
+   tab4 期限·品种·新老券（2026-10-25 参照华泰面板四维度）：⑦ 大类资产收益率
+   快照拼表 ⑧ 收益率曲线（国债/国开分期限水平，spread yld 组）⑨ 信用（品种
+   tab × 上锚评级 YTM 分期限 / 下各评级 3Y 利差）⑩ 新老券利差（10Y 新券−次新券，
+   source/bond_switch 中债估值）——tab4 消费 DATA.spread（SECS.value 预载）；
    隐藏 pane 内 echarts.init 取 0 尺寸 → 激活时才绘制该组图（spread.js 双分页同款）
      ② 国开-国债——利差线 + 隐含税率线同卡两图（超储卡先例：单位不同
         各自单轴，禁双轴）；tax 无 pct3y（数据侧未派生）→ 副标题不显示分位
@@ -229,6 +233,137 @@ PANELS["value"] = {
       ] : h("div", {class: "empty"}, ["一般贷款利率待接入（python scripts/update.py --only value）"]),
     ]);
 
+    /* —— tab4「期限·品种·新老券」（2026-10-25 参照华泰面板四维度）：
+       消费 DATA.spread（app.js SECS.value 预载 m_spread.json；variety.html 总览页
+       无按需加载 → 该页曲线/信用两卡降级空态）+ fundamentals.overseas 美债 —— */
+    const SP = D.spread || {};
+    const sm = SP.series || {};
+    const spSnap = (SP.snapshot && SP.snapshot.rows) || [];
+    const lastV = (s) => (s && Array.isArray(s.values) ? lastNum(s.values) : null);
+
+    /* ⑦ 大类资产收益率快照：利率债曲线 / 信用各品种(锚评级 3Y) / 权益·地产 / 海外 */
+    const OV = (D.fundamentals && D.fundamentals.overseas) || {};
+    const BS = V.bondSwitch || {};
+    const assetRows = [];
+    spSnap.filter((r) => r.unit === "%" && num(r.curr))
+      .forEach((r) => assetRows.push(["利率债", r.name, App.fmt(r.curr, 2) + "%", "财汇中债曲线"]));
+    (SP.variety || []).forEach((v) => {
+      const val = lastV(v.ytm && v.ytm["3Y"]);
+      if (val !== null) assetRows.push(["信用债", v.name + " 3Y", App.fmt(val, 2) + "%", "锚评级 " + v.anchor]);
+    });
+    if (dvDy) assetRows.push(["权益", "中证红利股息率", App.fmt(lastNum(dvDy.values), 2) + "%", "滚动244日分红再投"]);
+    if (lbLv) assetRows.push(["地产·信贷", "房贷利率（季度）", App.fmt(lastNum(lbLv.values), 2) + "%", "央行货政报告"]);
+    if (lbRv) assetRows.push(["地产·信贷", "百城租金回报率（月度手录）", App.fmt(lastNum(lbRv.values), 2) + "%", "中指50城租金房价比"]);
+    [["美债2Y", "usy2y"], ["美债10Y", "usy10y"], ["美债30Y", "usy30y"]].forEach(([n, k]) => {
+      const val = lastV(OV[k]);
+      if (val !== null) assetRows.push(["海外", n, App.fmt(val, 2) + "%", "fundamentals.overseas"]);
+    });
+    ["国债10Y", "国开10Y"].forEach((k) => {
+      const val = lastV(BS[k]);
+      if (val !== null) assetRows.push(["换券", k + " 新券−次新券", App.fmt(val, 1) + "bp", (BS[k] && BS[k].note) || ""]);
+    });
+    const assetBox = h("div", {id: "value-asset-table"});
+    const assetCard = h("section", {class: "card", id: "value-asset-card"}, [
+      h("h3", {class: "card-title"}, ["大类资产收益率快照"]),
+      App.badge("spread 曲线 + value 各比价段拼表 · 最新值", fetchedAt),
+      h("p", {class: "card-sub"}, [assetRows.length
+        ? "跨资产当前收益率横向一览（利率债曲线 / 信用各品种 3Y 锚评级 / 股息·房贷·租金 / 美债 / 新老券）——华泰「不同类型资产收益率」口径"
+        : "快照数据待接入"]),
+      assetRows.length ? assetBox : null,
+    ]);
+    if (assetRows.length) Charts.table(assetBox, {
+      columns: [{key: "k0", label: "类别"}, {key: "k1", label: "资产"}, {key: "k2", label: "最新收益率", num: true}, {key: "k3", label: "口径"}],
+      rows: assetRows.map((r) => ({k0: r[0], k1: r[1], k2: r[2], k3: r[3]})),
+    });
+
+    /* ⑧ 收益率曲线（不同期限利率）：品种 chips + 各期限水平线 */
+    const yldSeries = Object.values(sm).filter((s) => s.group === "yld" && has(s.values));
+    const curveSel = new Set(["国债"]);
+    const curveBox = h("div", {id: "value-curve-chart", class: "chart"});
+    const curveChips = h("div", {style: {display: "flex", flexWrap: "wrap", gap: "6px", margin: "0 0 10px"}},
+      ["国债", "国开"].map((v) => h("button", {
+        class: "chip" + (curveSel.has(v) ? " on" : ""),
+        style: curveSel.has(v) ? {} : {opacity: "0.45"},
+        onclick: (e) => {
+          if (curveSel.has(v) && curveSel.size === 1) return;
+          curveSel.has(v) ? curveSel.delete(v) : curveSel.add(v);
+          e.currentTarget.classList.toggle("on", curveSel.has(v));
+          e.currentTarget.style.opacity = curveSel.has(v) ? "" : "0.45";
+          redrawCurve();
+        }}, [v])));
+    function redrawCurve() {
+      const lines = yldSeries.filter((s) => curveSel.has(s.label.split(" ")[0]))
+        .map((s) => ({name: s.label, dates: s.dates, values: s.values}));
+      Charts.line(curveBox, {series: lines, yUnit: "%", range: "3Y"});
+    }
+    const usyStrip = ["usy2y", "usy10y", "usy30y"].map((k, i) =>
+      lastV(OV[k]) === null ? "" : ["美债2Y", "美债10Y", "美债30Y"][i] + " " + App.fmt(lastV(OV[k]), 2) + "%"
+    ).filter(Boolean).join(" · ");
+    const curveCard = h("section", {class: "card", id: "value-curve-card"}, [
+      h("h3", {class: "card-title"}, ["收益率曲线（不同期限利率）"]),
+      App.badge("自建存储 · 财汇中债曲线（spread 段）", (SP.snapshot && SP.snapshot.asOf) || fetchedAt),
+      h("p", {class: "card-sub"}, [yldSeries.length
+        ? "国债/国开各期限 YTM 水平（1/3/5/7/10/30Y）· 勾选品种同刷" + (usyStrip ? " · 海外对照：" + usyStrip : "")
+        : "曲线水平序列待接入（主站 value 面板自动加载 spread 段；variety 子页无按需加载）"]),
+      yldSeries.length ? [curveChips, curveBox] : h("div", {class: "empty"}, ["曲线水平序列待接入"]),
+    ]);
+
+    /* ⑨ 信用收益率与利差（不同风险利率）：品种 tab ×（上：锚评级 YTM 分期限 / 下：各评级 3Y 利差） */
+    const CRED = [["中短期票据", "中票 "], ["城投债", "城投债 "],
+                  ["银行二级资本债", "商业银行二级资本债 "], ["银行永续债", "商业银行永续债 "]];
+    const credYtm = (name) => (SP.variety || []).find((v) => v.name === name) || null;
+    const credBox1 = h("div", {class: "chart", style: {height: "260px"}});
+    const credBox2 = h("div", {class: "chart", style: {height: "260px"}});
+    const credTabs = h("div", {class: "tabs"});
+    let credCur = 0;
+    function drawCredit(i) {
+      credCur = i;
+      credTabs.querySelectorAll(".tab").forEach((b, j) => b.classList.toggle("active", j === i));
+      const [name, pfx] = CRED[i];
+      const v = credYtm(name);
+      const ytmLines = v ? Object.entries(v.ytm || {}).map(([t, s]) =>
+        ({name: t + "（锚" + v.anchor + "）", dates: s.dates, values: s.values})).filter((s) => has(s.values)) : [];
+      if (ytmLines.length) Charts.line(credBox1, {series: ytmLines, yUnit: "%", range: "3Y"});
+      else { credBox1.innerHTML = ""; credBox1.append(h("div", {class: "empty"}, ["YTM 序列待接入"])); }
+      const sprLines = Object.values(sm).filter((s) =>
+        s.label && s.label.startsWith(pfx) && s.label.includes(" 3Y") && has(s.values))
+        .sort((a, b) => a.label.localeCompare(b.label))
+        .map((s) => ({name: s.label.replace(" 3Y", ""), dates: s.dates, values: s.values}));
+      if (sprLines.length) Charts.line(credBox2, {series: sprLines, yUnit: "bp", range: "3Y"});
+      else { credBox2.innerHTML = ""; credBox2.append(h("div", {class: "empty"}, ["评级利差序列待接入"])); }
+      credSub.textContent = v ? name + " · 上图 YTM 锚评级 " + v.anchor + "（分期限）· 下图各评级 3Y 信用利差 vs 国开" : name;
+    }
+    const credSub = h("p", {class: "card-sub"}, []);
+    CRED.forEach(([name], i) => credTabs.append(
+      h("button", {class: "tab" + (i === 0 ? " active" : ""), onclick: () => drawCredit(i)}, [name])));
+    const creditCard = h("section", {class: "card", id: "value-credit-card"}, [
+      h("h3", {class: "card-title"}, ["信用收益率与利差（不同风险利率）"]),
+      App.badge("财汇中债曲线 · YTM 锚评级 + 各评级利差 vs 国开", (SP.snapshot && SP.snapshot.asOf) || fetchedAt),
+      credSub, credTabs,
+      cap("YTM 水平（%，锚评级，分期限）"), credBox1,
+      cap("信用利差 vs 国开（bp，3Y，各评级档）"), credBox2,
+    ]);
+
+    /* ⑩ 新老券利差（10Y 国债/国开 新券−次新券，中债估值口径） */
+    const bsGet = (k) => (BS[k] && Array.isArray(BS[k].dates) && has(BS[k].values))
+      ? {name: k, dates: BS[k].dates, values: BS[k].values, src: BS[k]} : null;
+    const bsLines = ["国债10Y", "国开10Y"].map(bsGet).filter(Boolean);
+    const bsBox = h("div", {id: "value-switch-chart", class: "chart"});
+    const bsSub = bsLines.map((s) =>
+      s.name + " 当前 " + App.fmt(lastNum(s.src.values), 1) + "bp" + pctTxt(s.src)).join(" · ");
+    const bsNotes = bsLines.map((s) => s.src.note).filter(Boolean);
+    const switchCard = h("section", {class: "card", id: "value-switch-card"}, [
+      h("h3", {class: "card-title"}, ["新老券利差（10Y 新券−次新券）"]),
+      App.badge("财汇中债估值表 · source/bond_switch 按发行年份+期数取最新两只", fetchedAt),
+      h("p", {class: "card-sub"}, [bsLines.length
+        ? bsSub + " · 换券日序列跳变属正常（新老券切换）"
+        : "新老券利差待接入（python scripts/update.py --only value）"]),
+      bsLines.length ? [bsBox,
+        bsNotes.length ? h("div", {style: Object.assign({marginTop: "8px"}, noteStyle)}, [bsNotes.join("；")]) : null,
+        BS.note ? h("div", {style: Object.assign({marginTop: "8px"}, noteStyle)}, [BS.note]) : null]
+        : h("div", {class: "empty"}, ["新老券利差待接入"]),
+    ]);
+
     /* —— 组装：三 tab 分组（2026-10-23 参照华泰面板按比较对象分组，六卡全保留）。
        echarts.init 需容器在文档中取非零宽高 → 隐藏 pane 不绘制，激活时调该组
        draw；Charts.line 同 el 先 dispose 再 init，重复激活重绘无残留 —— */
@@ -265,6 +400,13 @@ PANELS["value"] = {
                       data: [{yAxis: 0}]}});
          if (lbLevel.length) Charts.line(lvBox, {series: lbLevel, yUnit: "%", range: "ALL"});
          if (lbSpread.length) Charts.line(spBox, {series: lbSpread, yUnit: "bp", range: "ALL"});
+       }},
+      {label: "期限·品种·新老券", hint: "大类资产收益率快照 + 收益率曲线（不同期限利率）+ 信用（不同风险利率）+ 新老券利差",
+       cards: [assetCard, curveCard, creditCard, switchCard],
+       draw: () => {
+         if (yldSeries.length) redrawCurve();
+         drawCredit(credCur);
+         if (bsLines.length) Charts.line(bsBox, {series: bsLines, yUnit: "bp", range: "ALL"});
        }},
     ];
     const paneTabs = h("div", {class: "tabs", id: "value-pane-tabs"});
