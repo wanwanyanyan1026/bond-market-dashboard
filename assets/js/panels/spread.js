@@ -93,17 +93,28 @@ PANELS["spread"] = {
       : n.startsWith("二级资本债-中票") || n.startsWith("永续债-中票")
         || n.startsWith("银行永续债-中票") ? 4
       : n.startsWith("二级资本债-商金债") || n.startsWith("永续债-商金债") ? 5
-      : n.startsWith("城投-中票") ? 6 : 0;
-    const SEG_TITLES = ["利率债期限利差", "银行资本债信用利差（vs 国开）",
-                        "中票信用利差（vs 国开）", "城投债信用利差（vs 国开）",
-                        "银行资本债-中票品种利差（同等级同期限）",
-                        "二永-商金债利差（次级/永续期权价值；AAA- 档 vs 银行普通 AAA 为错档含评级差，AA+ 档同档）",
-                        "城投-中票品种利差（同等级同期限，城投溢价）"];
-    const snapRows = snap.rows.filter((r) => !r.name.startsWith("等级利差"));
-    // 收益率/利差分流（2026-09-14）：段 0 无"利差"字样行 = 利率债收益率 → tab1；
-    // tab2 只留利差行（期限/信用/品种），段 1-4 原本全为利差不受影响
-    const seg0YldRows = snapRows.filter((r) => seg(r.name) === 0 && !r.name.includes("利差"));
-    const spreadRows = snapRows.filter((r) => !(seg(r.name) === 0 && !r.name.includes("利差")));
+      : n.startsWith("城投-中票") ? 6 : 0;      // 仅供 yields 表（其行名未带 group）
+    const snapRows = snap.rows;                  // 2026-10-25 起行带 group（build 侧）
+    const g = (name) => snapRows.filter((r) => (r.group || "") === name);
+    /* 周度快照双分页（group 驱动，2026-10-25）：tab1 收益率水平（yld 组，含
+       农发/口行/地方债）；tab2 利差行按组分段（新增 policy/term/govsp/credterm/
+       bankpair/grade 段参照华泰矩阵） */
+    const seg0YldRows = g("yld");
+    const spreadRows = snapRows.filter((r) => (r.group || "") !== "yld");
+    const SNAP_SEGS = [
+      [["policy"], "政策与资金利差"],
+      [["term"], "利率债期限利差（相邻期限）"],
+      [["govsp"], "利率债品种利差"],
+      [["bank"], "银行资本债信用利差（vs 国开）"],
+      [["mtn"], "中票信用利差（vs 国开）"],
+      [["chengtou"], "城投债信用利差（vs 国开）"],
+      [["credterm"], "信用债期限利差（分评级）"],
+      [["bankmtn"], "银行资本债-中票品种利差（同等级同期限）"],
+      [["bankcomm"], "二永-商金债利差（AAA- 档 vs 银行普通 AAA 为错档含评级差，AA+ 档同档）"],
+      [["ctmtn"], "城投-中票品种利差（同等级同期限，城投溢价）"],
+      [["bankpair"], "永续-二级品种利差（同档同期限）"],
+      [["grade"], "评级利差（相邻档）"],
+    ];
     function mkTable(rows, id, title) {
       const box = h("div", {id: id});
       const trs = Charts.table(box, {
@@ -123,15 +134,16 @@ PANELS["spread"] = {
       return [h("div", {style: {margin: "10px 0 2px", fontSize: "13px",
                                 color: "var(--muted)"}}, [title]), box];
     }
-    function segTable(gi, tag) {
-      return mkTable(spreadRows.filter((r) => seg(r.name) === gi),
-                     "spread-snap-table-" + gi + (tag ? "-" + tag : ""), SEG_TITLES[gi]);
+    function segTable(si, tag) {
+      const groups = SNAP_SEGS[si][0];
+      return mkTable(spreadRows.filter((r) => groups.includes(r.group || "")),
+                     "spread-snap-table-" + si + (tag ? "-" + tag : ""), SNAP_SEGS[si][1]);
     }
-    const leftTables = [0, 1, 2, 3].map((gi) => segTable(gi));
-    const rightTables = [4, 5, 6].map((gi) => segTable(gi, "r"));   // 右栏: 资本债-中票 + 二永-商金债 + 城投-中票（品种间利差对，2026-09-17）
+    const leftTables = [0, 1, 2, 3, 4, 5].map((si) => segTable(si));
+    const rightTables = [6, 7, 8, 9, 10, 11].map((si) => segTable(si, "r"));
     const snapBody = !snapRows.length
       ? h("div", {class: "empty"}, ["利差快照数据待接入（python scripts/update.py --only spread）"])
-      : (spreadRows.some((r) => seg(r.name) === 4)
+      : (spreadRows.some((r) => (r.group || "") === "bankmtn")
           ? h("div", {class: "grid grid-2"}, [h("div", {}, leftTables), h("div", {}, rightTables)])
           : leftTables);
     const snapSub = h("div", {style: {margin: "6px 0 0", fontSize: "12px", color: "var(--muted)"}}, [
@@ -287,53 +299,173 @@ PANELS["spread"] = {
         : h("div", {class: "empty"}, ["品种明细待接入（python scripts/update.py --only spread）"]),
     ]);
 
-    /* —— ⓪' 当日利差总览（2026-10-25，参照华泰面板）：130 项快照按段分组，
-       较前日/近5日变动 + 近3年 P25/P50/P75 + 当前分位（Charts.table 纯 DOM，
-       无 echarts，构建期即画）—— */
-    function dayTable(gi) {
-      const rows = snapRows.filter((r) => seg(r.name) === gi);
-      if (!rows.length) return null;
-      const box = h("div", {id: "spread-day-table-" + gi});
-      const trs = Charts.table(box, {
-        columns: [{key: "k0", label: "指标"}, {key: "k1", label: "当前", num: true},
-                  {key: "k2", label: "较前日", num: true}, {key: "k3", label: "近5日", num: true},
-                  {key: "k4", label: "近3年 P25/P50/P75"}, {key: "k5", label: "当前分位", num: true}],
-        rows: rows.map((r) => ({
-          k0: r.name,
-          k1: r.unit === "%" ? App.fmt(r.curr, 2) + "%" : App.fmt(r.curr, 2),
-          k2: r.chg1d === null ? "—" : (r.chg1d > 0 ? "+" : "") + App.fmt(r.chg1d, 2),
-          k3: r.chg5d === null ? "—" : (r.chg5d > 0 ? "+" : "") + App.fmt(r.chg5d, 2),
-          k4: r.p25 === null ? "—" : [r.p25, r.p50, r.p75].map((p) => App.fmt(p, 1)).join(" / "),
-          k5: r.pct3y === null ? "—" : App.fmt(r.pct3y, 1),
-        })),
-      });
-      trs.forEach((tr, i) => {   // 较前日列着色（正红/负绿/零灰，同快照表惯例）
-        const v = rows[i].chg1d;
-        if (num(v)) tr.children[2].replaceChildren(
-          h("span", {class: v > 0 ? "up" : v < 0 ? "down" : "flat"},
-            [(v > 0 ? "+" : "") + App.fmt(v, 2) + "bp"]));
-      });
-      return [h("div", {style: {margin: "10px 0 2px", fontSize: "13px",
-                                color: "var(--muted)"}}, [SEG_TITLES[gi]]), box];
-    }
-    const dayKids = SEG_TITLES.map((_, gi) => dayTable(gi)).filter(Boolean);
-    const dayCard = h("section", {class: "card", id: "spread-day-card"}, [
-      h("h3", {class: "card-title"}, ["当日利差总览（" + snapRows.length + " 项）"]),
-      App.badge(BADGE, fetchedAt),
-      h("p", {class: "card-sub"}, [snapRows.length
-        ? "截至 " + snap.asOf + " · 较前日/近5日变动（bp）与近 3 年 P25/P50/P75（窗口值分布，水平位置感）"
-          + " · 当前分位=近 3 年滚动百分位 · 收益率行当前值 %、变动一律 bp"
-        : "快照数据待接入"]),
-      dayKids.length ? h("div", {class: "grid grid-2"}, [h("div", {}, dayKids.slice(0, 4)), h("div", {}, dayKids.slice(4))])
-        : h("div", {class: "empty"}, ["利差快照数据待接入"]),
+    /* —— ⓪' 当日利差总览（2026-10-25 二版，直接参照华泰面板）：①轨条速览
+       （分位轴轨条：浅块=P25-75、竖线=中位、圆点=当日分位位置）+ ②分组热力
+       矩阵（格=当日利差 bp，底色=近3年分位色阶，title=值/较前日/P25/50/75）。
+       数据：snapshot.rows（group 驱动分组）+ DATA.value.bondSwitch（新老券矩阵）—— */
+    const rowBy = {};
+    snapRows.forEach((r) => { rowBy[r.name] = r; });
+    const pctColor = (p) => (p === null || p === undefined) ? ""
+      : p < 10 ? "#c8e4d4" : p < 25 ? "#e0efe6" : p < 50 ? "#eef2f6"
+      : p < 75 ? "#f9eddd" : p < 90 ? "#f4dcc0" : "#f1c5b4";
+    const dotColor = (p) => (p === null || p === undefined) ? "#8a95a5"
+      : p < 25 ? "#16865c" : p > 75 ? "#c24135" : "#2a78d6";
+    const fmtS = (v, d) => (v === null || v === undefined) ? "—" : App.fmt(v, d);
+
+    /* 新老券伪快照行（value 段序列 → 矩阵行；chg1d 前端自算） */
+    const BSrows = [];
+    const BSd = (D.value && D.value.bondSwitch) || {};
+    Object.keys(BSd).forEach((label) => {
+      if (label === "note") return;
+      const s = BSd[label], m = label.match(/^(\d+)Y(国债|国开)$/);
+      if (!m || !Array.isArray(s.values)) return;
+      const vals = s.values.filter((x) => x !== null);
+      const curr = vals[vals.length - 1];
+      BSrows.push({name: m[2] + " " + m[1] + "Y", curr, unit: "bp", group: "switch",
+                   chg1d: vals.length > 1 ? Math.round((curr - vals[vals.length - 2]) * 100) / 100 : null,
+                   chg5d: null, p25: s.p25, p50: s.p50, p75: s.p75, pct3y: s.pct3y && s.pct3y[s.pct3y.length - 1]});
+    });
+
+    /* ① 轨条速览：分位轴（0-100）上 P25-75 带 + 中位线 + 当日点 */
+    const rail = (r) => {
+      const p = (r.pct3y === null || r.pct3y === undefined) ? null : Math.max(0, Math.min(100, r.pct3y));
+      return h("div", {style: {display: "flex", alignItems: "center", gap: "8px", margin: "3px 0"}}, [
+        h("div", {title: r.name, style: {width: "158px", fontSize: "12px", color: "var(--ink2, #44576a)",
+          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"}}, [r.name]),
+        h("div", {style: {position: "relative", flex: "1", minWidth: "110px", height: "12px",
+                          background: "#edf1f5", borderRadius: "6px"}}, [
+          h("div", {style: {position: "absolute", left: "25%", width: "50%", top: "2px", bottom: "2px",
+                            background: "#dbe5ee", borderRadius: "5px"}}),
+          h("div", {style: {position: "absolute", left: "50%", top: "-1px", bottom: "-1px",
+                            width: "1px", background: "#b6c3d0"}}),
+          p === null ? null : h("div", {
+            title: "当前 " + fmtS(r.curr, 1) + "bp · 分位 " + fmtS(r.pct3y, 0)
+                   + " · P25/50/75 " + fmtS(r.p25, 1) + "/" + fmtS(r.p50, 1) + "/" + fmtS(r.p75, 1),
+            style: {position: "absolute", left: "calc(" + p + "% - 5px)", top: "1px", width: "10px",
+                    height: "10px", borderRadius: "50%", background: dotColor(r.pct3y),
+                    border: "1.5px solid #fff", boxShadow: "0 0 0 1px rgba(30,40,60,.15)"}}),
+        ]),
+        h("div", {style: {width: "86px", fontSize: "12px", fontVariantNumeric: "tabular-nums",
+                          textAlign: "right", color: p === null ? "var(--muted)" : dotColor(r.pct3y)}},
+          [(r.chg1d === null || r.chg1d === undefined) ? "" :
+            h("span", {class: r.chg1d > 0 ? "up" : r.chg1d < 0 ? "down" : "flat",
+                       style: {fontSize: "11px", marginRight: "4px"}},
+              [(r.chg1d > 0 ? "+" : "") + App.fmt(r.chg1d, 1)]),
+           " " + fmtS(r.curr, 1) + " · " + (p === null ? "—" : fmtS(r.pct3y, 0) + "%")]),
+      ]);
+    };
+    const railFind = (name) => rowBy[name] || BSrows.find((r) => r.name === name);
+    const RAIL_GROUPS = [
+      ["政策与资金", ["DR001-OMO7D", "DR007-OMO7D", "R001-DR001", "R007-DR007", "国债1Y-DR007"]],
+      ["国债期限利差", ["国债 3Y-1Y", "国债 5Y-3Y", "国债 10Y-7Y", "国债 30Y-10Y"]],
+      ["品种与新老券", ["国开-国债 10Y", "地方债-国债 30Y", "永续-二级 AAA- 3Y", "国债 10Y"]],
+      ["信用利差", ["中票 AA+ 3Y", "中票 AAA 5Y", "商业银行二级资本债 AAA- 3Y", "商业银行永续债 AAA- 5Y"]],
+    ];
+    const railCard = h("section", {class: "card", id: "spread-rail-card"}, [
+      h("h3", {class: "card-title"}, ["当日核心利差速览"]),
+      App.badge(BADGE + " · 轨条=近三年分位轴", fetchedAt),
+      h("p", {class: "card-sub"}, ["浅色块=P25-P75 · 竖线=中位数 · 圆点=当日分位位置（绿=偏低/红=偏高）"
+        + " · 右侧=当日值bp 与较前日变动 · 悬浮见 P25/50/75"]),
+      h("div", {class: "grid grid-2"}, RAIL_GROUPS.map(([t, names]) => {
+        const rs = names.map(railFind).filter(Boolean);
+        return h("div", {}, [h("div", {style: {margin: "6px 0 4px", fontSize: "13px",
+          color: "var(--muted)", fontWeight: 600}}, [t]), ...rs.map(rail)]);
+      })),
     ]);
+
+    /* ② 分组热力矩阵：行名=名称去最后段 / 列=最后段（期限或期限对），格底色=分位色阶 */
+    const tenorKey = (cn) => { const m = String(cn).match(/(\d+)Y/); return m ? +m[1] : 99; };
+    function matrix(title, rows, id) {
+      if (!rows.length) return null;
+      const cols = [], rowMap = new Map();
+      rows.forEach((r) => {
+        const i = r.name.lastIndexOf(" ");
+        const rn = i < 0 ? r.name : r.name.slice(0, i);
+        const cn = i < 0 ? "" : r.name.slice(i + 1);
+        if (!rowMap.has(rn)) rowMap.set(rn, {});
+        rowMap.get(rn)[cn] = r;
+        if (cn && !cols.includes(cn)) cols.push(cn);
+      });
+      cols.sort((a, b) => tenorKey(a) - tenorKey(b));
+      const cell = (r) => r ? h("td", {
+        title: r.name + "｜当前 " + fmtS(r.curr, 1) + "bp（" + (r.unit === "%" ? "水平%" : "bp") + "）"
+          + (num(r.chg1d) ? "｜较前日 " + (r.chg1d > 0 ? "+" : "") + App.fmt(r.chg1d, 1) : "")
+          + "｜P25/50/75 " + fmtS(r.p25, 1) + "/" + fmtS(r.p50, 1) + "/" + fmtS(r.p75, 1)
+          + "｜分位 " + fmtS(r.pct3y, 0),
+        style: {padding: "3px 8px", textAlign: "right", fontSize: "12px",
+                fontVariantNumeric: "tabular-nums", background: pctColor(r.pct3y),
+                color: "#33414f", border: "1px solid #e4e9f0", whiteSpace: "nowrap"},
+      }, [App.fmt(r.curr, 1)]) : h("td", {style: {border: "1px solid #e4e9f0"}}, [""]);
+      return h("div", {class: "card", id: id, style: {marginBottom: "12px"}}, [
+        h("div", {style: {fontSize: "13px", fontWeight: 600, margin: "8px 0 6px",
+                          color: "var(--ink2, #44576a)"}}, [title + "（" + rows.length + "）"]),
+        h("table", {class: "tbl", style: {borderCollapse: "collapse", width: "100%"}}, [
+          h("thead", {}, [h("tr", {}, [h("th", {style: {textAlign: "left", padding: "3px 8px",
+            fontSize: "12px", color: "var(--muted)", border: "1px solid #e4e9f0"}}, [""])]
+            .concat(cols.map((c) => h("th", {style: {padding: "3px 8px", fontSize: "12px",
+              color: "var(--muted)", border: "1px solid #e4e9f0", textAlign: "right"}}, [c]))))]),
+          h("tbody", {}, [...rowMap.entries()].map(([rn, cs]) =>
+            h("tr", {}, [h("td", {style: {padding: "3px 8px", fontSize: "12px", whiteSpace: "nowrap",
+              color: "#33414f", border: "1px solid #e4e9f0"}}, [rn])]
+              .concat(cols.map((c) => cell(cs[c])))))),
+        ]),
+      ]);
+    }
+    /* 政策与资金：单列指标 → 明细表（含较前日/近5日/P25/50/75/分位） */
+    function policyTable(rows) {
+      if (!rows.length) return null;
+      return h("div", {class: "card", id: "spread-day-policy", style: {marginBottom: "12px"}}, [
+        h("div", {style: {fontSize: "13px", fontWeight: 600, margin: "8px 0 6px",
+                          color: "var(--ink2, #44576a)"}}, ["政策与资金利差（" + rows.length + "）"]),
+        (() => {
+          const box = h("div", {});
+          Charts.table(box, {
+            columns: [{key: "k0", label: "指标"}, {key: "k1", label: "当前bp", num: true},
+                      {key: "k2", label: "较前日", num: true}, {key: "k3", label: "近5日", num: true},
+                      {key: "k4", label: "近3年 P25/P50/P75"}, {key: "k5", label: "分位", num: true}],
+            rows: rows.map((r) => ({
+              k0: r.name, k1: fmtS(r.curr, 1),
+              k2: r.chg1d === null ? "—" : (r.chg1d > 0 ? "+" : "") + App.fmt(r.chg1d, 1),
+              k3: r.chg5d === null ? "—" : (r.chg5d > 0 ? "+" : "") + App.fmt(r.chg5d, 1),
+              k4: r.p25 === null ? "—" : [r.p25, r.p50, r.p75].map((p) => App.fmt(p, 1)).join(" / "),
+              k5: fmtS(r.pct3y, 0)})),
+          });
+          return box;
+        })(),
+      ]);
+    }
+    const MAT_DEFS = [
+      ["期限利差 · 利率债（相邻期限，bp）", g("term"), "spread-mat-term"],
+      ["信用利差 · 中票 vs 国开（bp）", g("mtn"), "spread-mat-mtn"],
+      ["信用利差 · 城投 vs 国开（bp）", g("chengtou"), "spread-mat-ct"],
+      ["信用利差 · 银行资本债 vs 国开（bp）", g("bank"), "spread-mat-bank"],
+      ["期限利差 · 信用债分评级（bp）", g("credterm"), "spread-mat-credterm"],
+      ["品种利差 · 利率债（bp）", g("govsp"), "spread-mat-govsp"],
+      ["品种利差 · 资本债-中票（同档，bp）", g("bankmtn"), "spread-mat-bankmtn"],
+      ["品种利差 · 二永-商金债（bp）", g("bankcomm"), "spread-mat-bankcomm"],
+      ["品种利差 · 城投-中票（同档，bp）", g("ctmtn"), "spread-mat-ctmtn"],
+      ["品种利差 · 永续-二级（同档，bp）", g("bankpair"), "spread-mat-bankpair"],
+      ["评级利差 · 相邻档（bp）", g("grade"), "spread-mat-grade"],
+      ["新老券利差 · 新券-次新券（bp）", BSrows, "spread-mat-switch"],
+    ].map(([t, rows, id]) => matrix(t, rows, id)).filter(Boolean);
+    const dayCard = h("section", {class: "card", id: "spread-day-card"}, [
+      h("h3", {class: "card-title"}, ["当日利差总览热力矩阵"]),
+      App.badge(BADGE + " · 格底色=近3年分位（绿低红高）", fetchedAt),
+      h("p", {class: "card-sub"}, [snapRows.length
+        ? "截至 " + snap.asOf + " · 上格=当日利差 bp，底色=近 3 年滚动分位（悬浮见较前日与 P25/50/75）"
+          + " · 行=品种/评级，列=期限（列头 Y）"
+        : "快照数据待接入"]),
+      policyTable(g("policy")),
+      h("div", {class: "grid grid-2"}, [h("div", {}, MAT_DEFS.filter((_, i) => i % 2 === 0)),
+                                        h("div", {}, MAT_DEFS.filter((_, i) => i % 2 === 1))]),
+    ]);
+    const dayWrap = h("div", {id: "spread-pane-day"}, [railCard, dayCard]);
 
     /* —— 面板级双 tab（2026-10-25）：当日利差总览 / 序列与周度明细（原五卡）。
        seq pane 含 echarts → 激活时才绘制（隐藏期 init 取 0 尺寸，value.js tab 同款）；
        重进 dispatch resize 修正隐藏期间窗口变化 —— */
     const seqWrap = h("div", {id: "spread-pane-seq", style: {display: "none"}},
       [snapCard, allCard, detailCard, bankCard, bankmtnCard]);
-    const dayWrap = h("div", {id: "spread-pane-day"}, [dayCard]);
     const paneTabs = h("div", {class: "tabs", id: "spread-pane-tabs"}, [
       h("button", {class: "tab active", "data-g": "0", onclick: () => showPane(0)}, ["当日利差总览"]),
       h("button", {class: "tab", "data-g": "1", onclick: () => showPane(1)}, ["序列与周度明细"]),
