@@ -1,5 +1,5 @@
 <!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1"><title>深业集团有限公司信用主体信评报告（框架稿）</title><style>
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>深业集团有限公司信用主体信评报告（完整稿）</title><style>
 :root { color-scheme: light; }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
@@ -10,7 +10,7 @@ body { font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", san
 .rep-head .type { font-size: 12px; letter-spacing: 4px; color: #52514e; }
 .rep-head h1 { font-size: 24px; margin: 4px 0 2px; }
 .rep-head .meta { font-size: 12px; color: #6b6a66; }
-.badge { display: inline-block; background: #b35900; color: #fff; font-size: 12px;
+.badge { display: inline-block; background: #1e7b34; color: #fff; font-size: 12px;
   padding: 1px 10px; border-radius: 3px; letter-spacing: 2px; vertical-align: 3px; margin-left: 8px; }
 h2 { font-size: 17px; border-left: 4px solid #2a78d6; padding-left: 10px; margin: 26px 0 10px; }
 h3 { font-size: 14px; margin: 14px 0 6px; color: #33322f; }
@@ -18,9 +18,12 @@ table { border-collapse: collapse; width: 100%; font-size: 12.5px; margin: 8px 0
 th, td { border: 1px solid #ddd9d2; padding: 4px 8px; text-align: left; }
 th { background: #f4f2ee; font-weight: 600; }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-.todo { background: #fdf6e3; border: 1px dashed #d9b96a; padding: 8px 12px; margin: 6px 0;
-  color: #7a5b12; font-size: 13px; }
-.todo::before { content: "【待补】"; font-weight: 700; }
+.verdict { border-left: 4px solid #1e7b34; background: #f4faf5; padding: 10px 14px; margin: 10px 0; }
+.verdict.warn { border-left-color: #b8860b; background: #fdf9ef; }
+.ev { margin: 8px 0; }
+.ev-neg { color: #b3261e; font-weight: 700; }
+.src { font-size: 12px; color: #8a8884; }
+ul { margin: 6px 0 6px 22px; }
 .sig { display: inline-block; border-radius: 3px; padding: 1px 9px; font-size: 12px; margin: 0 6px 6px 0; }
 .sig-neg { background: #fdecec; color: #b3261e; border: 1px solid #f3c1bd; }
 .sig-pos { background: #e9f6ec; color: #1e7b34; border: 1px solid #bfe3c8; }
@@ -28,4 +31,50 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .hist { color: #6b6a66; }
 .note { font-size: 12px; color: #8a8884; margin-top: 4px; }
 </style></head><body><div class="page">
-<div class='rep-head'><div class='type'>信用主体信评报告 · 框架稿</div><h1>深业集团有限公司<span class='badge'>框架稿 · 自动生成</span></h1><div class='meta'>地产 · 广东 ｜ 数据截至 2026-11-06 收盘（财汇 中债估值/成交）｜ 生成 2026-11-07 ｜ 触发原因：高收益/异常偏离</div></div><h2>信号快照（自动）</h2><p><span class='sig sig-neg'>高收益预警 · 26深业01 3y内行权估值 1.86%（阈值 1.8%）</span><span class='sig sig-neg'>异常高估值成交 · 25深业MTN003 偏离 +16.6bp</span></p><p class='note'>口径：高收益=存续券行权剩余期限≤3y 且行权中债估值&gt;阈值；偏离=活跃券成交收益率−中债估值（二永/永续按到期口径、其余行权口径）；异常高估值阈值 2.0bp。</p><h2>存续券概览（自动 · 2026-11-06）</h2><table><thead><tr><th>债券简称</th><th>品种</th><th>发行方式</th><th class='num'>行权剩余期限(y)</th><th class='num'>行权估值(%)</th><th class='num'>成交收益率(%)</th><th class='num'>偏离(bp)</th><th class='num'>成交额(亿)</th></tr></thead><tbody><tr><td>25深业MTN003</td><td>中票</td><td>公募</td><td class='num'>3.98</td><td class='num'>2.02</td><td class='num'>2.19</td><td class='num'>+16.6 ⚠</td><td class='num'>0.2</td></tr><tr><td>24深业01</td><td>公司债(公募)</td><td>公募</td><td class='num'>0.35</td><td class='num'>1.6</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>24深业MTN001</td><td>中票</td><td>公募</td><td class='num'>0.35</td><td class='num'>1.55</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>24深业MTN002</td><td>中票</td><td>公募</td><td class='num'>0.37</td><td class='num'>1.55</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>24深业MTN003</td><td>中票</td><td>公募</td><td class='num'>0.72</td><td class='num'>1.58</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>25深业MTN001</td><td>中票</td><td>公募</td><td class='num'>1.62</td><td class='num'>1.67</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>25深业MTN002</td><td>中票</td><td>公募</td><td class='num'>1.63</td><td class='num'>1.67</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>25深业MTN004</td><td>中票</td><td>公募</td><td class='num'>2.09</td><td class='num'>1.76</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>24深业02</td><td>公司债(公募)</td><td>公募</td><td class='num'>2.35</td><td class='num'>1.77</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>26深业MTN002</td><td>中票</td><td>公募</td><td class='num'>2.38</td><td class='num'>1.78</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>26深业01</td><td>公司债(私募)</td><td>私募</td><td class='num'>2.69</td><td class='num'>1.86</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>24深业03</td><td>公司债(公募)</td><td>公募</td><td class='num'>2.89</td><td class='num'>1.8</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>24深业05</td><td>公司债(公募)</td><td>公募</td><td class='num'>3.02</td><td class='num'>1.81</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr></tbody></table><h2>舆情与边际变化（自动）</h2><p class='todo'>暂无该主体的舆情/公告记录（扫描无命中）；补充近一年重大公告与媒体舆情。</p><h2>行业定档与政策环境</h2><p class='todo'>参照《2026-10_房地产行业跟踪》定档写法：当前行业档位、驱动因素、含义与失效条件。</p><h2>销售与土储</h2><p class='todo'>月度销售金额/面积同比、权益比、拿地强度、土储城市能级分布与去化周期。</p><h2>财务与杠杆</h2><p class='todo'>三费率、毛利率、净负债率、现金短债比、合并/母公司口径差异。</p><h2>债务与再融资</h2><p class='todo'>存续债券结构（参照下方存续券表）、境内外到期分布、发行利差趋势、抵押/质押情况。</p><h2>股东支持</h2><p class='todo'>股东背景、历史支持动作（增资/担保/借款）、并表关系与流动性传导。</p><h2>结论与后续跟踪</h2><p class='todo'>综合以上给出：信用资质判断（稳健/关注/警惕）、核心边际变化（前值→本次）、后续跟踪点（具体可验证）与估值观点。</p><p class='note'>框架稿由 scaffold_reports.py 自动生成（2026-11-07），数据部分真实、分析章节待人工补充；成稿后请移出 scaffold_out 并在面板替换链接。</p></div></body></html>
+<div class='rep-head'><div class='type'>信用主体信评报告 · 完整稿 · LLM 辅助</div><h1>深业集团有限公司<span class='badge'>完整稿 · 2026-11-08</span></h1><div class='meta'>地产（地方国企综合运营） · 广东 · 深圳 ｜ 主体评级 AAA/稳定（面板记录 2025-08-15，<b style="color:#b3261e">有效期至 2026-08-14，已过期</b>；2026 年度跟踪报告暂未检索到）｜ 数据截至 2026-11-06 收盘（财汇 中债估值/成交）｜ 生成 2026-11-08 ｜ 触发原因：高收益 26深业01 1.86%（2.69y）＋ 25深业MTN003 成交偏离 +16.6bp/D1 估值 +4.9bp</div></div><h2>信号快照（自动）</h2><p><span class='sig sig-neg'>高收益预警 · 26深业01 3y内行权估值 1.86%（阈值 1.8%）</span><span class='sig sig-neg'>异常高估值成交 · 25深业MTN003 偏离 +16.6bp</span></p><p class='note'>口径：高收益=存续券行权剩余期限≤3y 且行权中债估值&gt;阈值；偏离=活跃券成交收益率−中债估值（二永/永续按到期口径、其余行权口径）；异常高估值阈值 2.0bp。</p><h2>存续券概览（自动 · 2026-11-06）</h2><table><thead><tr><th>债券简称</th><th>品种</th><th>发行方式</th><th class='num'>行权剩余期限(y)</th><th class='num'>行权估值(%)</th><th class='num'>成交收益率(%)</th><th class='num'>偏离(bp)</th><th class='num'>成交额(亿)</th></tr></thead><tbody><tr><td>25深业MTN003</td><td>中票</td><td>公募</td><td class='num'>3.98</td><td class='num'>2.02</td><td class='num'>2.19</td><td class='num'>+16.6 ⚠</td><td class='num'>0.2</td></tr><tr><td>24深业01</td><td>公司债(公募)</td><td>公募</td><td class='num'>0.35</td><td class='num'>1.6</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>24深业MTN001</td><td>中票</td><td>公募</td><td class='num'>0.35</td><td class='num'>1.55</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>24深业MTN002</td><td>中票</td><td>公募</td><td class='num'>0.37</td><td class='num'>1.55</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>24深业MTN003</td><td>中票</td><td>公募</td><td class='num'>0.72</td><td class='num'>1.58</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>25深业MTN001</td><td>中票</td><td>公募</td><td class='num'>1.62</td><td class='num'>1.67</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>25深业MTN002</td><td>中票</td><td>公募</td><td class='num'>1.63</td><td class='num'>1.67</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>25深业MTN004</td><td>中票</td><td>公募</td><td class='num'>2.09</td><td class='num'>1.76</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>24深业02</td><td>公司债(公募)</td><td>公募</td><td class='num'>2.35</td><td class='num'>1.77</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>26深业MTN002</td><td>中票</td><td>公募</td><td class='num'>2.38</td><td class='num'>1.78</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>26深业01</td><td>公司债(私募)</td><td>私募</td><td class='num'>2.69</td><td class='num'>1.86</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>24深业03</td><td>公司债(公募)</td><td>公募</td><td class='num'>2.89</td><td class='num'>1.8</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>24深业05</td><td>公司债(公募)</td><td>公募</td><td class='num'>3.02</td><td class='num'>1.81</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr></tbody></table><p class='note'>信号归因：①<b>25深业MTN003（3.98y）成交 2.19% vs 估值 2.02%，偏离 +16.6bp</b>，且当日估值 D1 +4.9bp（D5 +2.4bp）——估值与成交同向上行，是<b>趋势性重定价的早期形态</b>而非单笔流动性折价；②曲线形态异常陡峭：2.09y 1.76% → 3.02y 1.81% → 3.98y 2.02%，3 年以上段利差 +21bp（3.02→3.98y），显著陡于正常曲线，市场对久期风险的补偿要求在抬升；③26深业01（2.69y 私募公司债）1.86% 为阈值边缘高收益，较同期限公募 24深业03（2.89y、1.80%）高约 6bp，含私募流动性溢价。近 3 月无兑付（due90=0），下一批到期为 2027 年 3 月起 24深业01/MTN001/MTN002（合计约 0.35-0.37y，2027 年 3 月）。</p><h2>舆情与边际变化</h2><ul>
+<li class='ev'><b>[负面 · 2025-04-30] 集团 2024 年报首亏：归母净利 -5.94 亿（营收 171.24 亿、-10.1%）</b>；旗下上市平台深圳控股（0604.HK）连续第三年亏损。<span class='src'>来源：面板 news_history（2025-04-30，债市公告精选）</span></li>
+<li class='ev'><b>[负面 · 2025H1] 集团 2025 年前三季归母净利 -8.48 亿，亏损同比扩大</b>。<span class='src'>来源：面板 news_history（2025 年三季报口径）</span></li>
+<li class='ev'><b>[关注 · 2025-05-15] 换帅：吕华卸任董事长，王昱文接任</b>——管理层变动与地产行业下行叠加。<span class='src'>来源：面板 news_history（2025-05-15）</span></li>
+<li class='ev'><b>[负面 · 2026-03-30] 深圳控股 2025 年报：收益 403.64 亿港元（+159.3%，开发结转 342 亿集中交楼），股东应占亏损扩至 43.66 亿港元（2024 年 -18.23 亿），核心净利约 +5 亿港元</b>——亏损主因联营公司亏损分占与存货/资产减值计提，不派末期息。<span class='src'>来源：深圳控股 2025 年度业绩公告（港交所，2026-03-30；Yahoo 财经/Aastocks 报道交叉核对）</span></li>
+<li class='ev'><b>[中性偏正面 · 2026-08] 深圳控股 2026 中期盈喜式预告：预亏收窄至 19-21 亿港元（2025H1 为 -26.2 亿）</b>；2026H1 合约销售 67.59 亿港元，达全年 130 亿目标 52%；资管运营业务逆市增长。<span class='src'>来源：深圳控股 2026 中期业绩预告/公告（2026-08，futu/AAstocks 报道）</span></li>
+<li class='ev'><b>[中性 · 2025-12] 万科与深业集团就中山湾·中新城项目股权交易达成协议</b>——深业作为深圳国资代表参与万科项目处置，体现区域国企整合角色。<span class='src'>来源：万科企业 2025 年度报告（巨潮资讯，2026-04-01）</span></li>
+<li class='ev hist'>自动扫描（2026-11-06 当日）：无新增负面舆情命中；<b>25深业MTN003 估值 D1 +4.9bp/D5 +2.4bp 为面板估值变动信号</b>（非新闻类，已纳入上文归因）。</li>
+</ul><h2>行业定档与政策环境</h2><p class='note'>参照《2026-10 房地产行业跟踪》（本库）定档写法。</p><ul>
+<li><b>行业综合定档：C（走弱）</b>。驱动：供给端与资金端加速收缩——投资 -20.6%、新开工 -24.9%、到位资金 -21.6%（国内贷款 -33.1%）；9 月销售面积累计同比 -13.2% 降幅仍在扩大。早期改善迹象：10 月 50 城单月同比收窄 2.2pct、环比 +4.5%，70 城新房价格同比连续 6 个月收窄、一线环比续涨，需求「降幅见顶」尚未被累计口径确认。</li>
+<li><b>对深业的含义</b>：深圳/大湾区是本轮价格与成交最先企稳的区域（一线环比续涨），深业土储集中深圳及大湾区核心，销售端受损程度小于全国性房企；但结转毛利率下行+减值计提的报表出清仍在进行时（深圳控股 2025 年减值主导亏损），行业 C 档下「利润表修复滞后于销售企稳」是未来 2-4 个季度的基准情形。</li>
+<li><b>失效条件（行业档位上修）</b>：统计局销售面积累计同比降幅收窄至 -10% 以内且 70 城新房同比指数回升至 98 以上、房企到位资金降幅收窄至 -15% 以内——若达成则对本主体估值观点相应上修；反之若 11-12 月销售降幅再扩大，C 档下移风险上升。</li>
+</ul><h2>销售与土储</h2><ul>
+<li><b>上市平台口径（深圳控股，并表核心）</b>：2025 年合约销售 133.11 亿元人民币（Q4 34.73 亿/18.97 万㎡），按港元口径 2026H1 为 67.59 亿港元、完成全年 130 亿目标 52%——销售规模已从 2021 年峰值（400 亿+量级）收缩至百亿级，权益土储聚焦深圳（深业中城/上城系等城市更新项目）；2025 年结转 342 亿港元为集中交楼所致，后续结转规模将明显回落。</li>
+<li><b>集团口径</b>：地产开发（深圳控股）+产业园区（深业泰然集团等，65 个产业园）+物业（550+ 项目/1 亿+ 平米，物业百强 15 位、国企第 6）+基建（深业基建控股，独立发债主体）多元结构——<b>非开发业务（园区/物业/资管）提供稳定现金流缓冲</b>，这是深业与纯开发房企信用画像的关键差异。集团层面销售明细暂未获取（非上市主体，2025 债券年报未公开检索到）。</li>
+</ul><p class='src'>来源：深圳控股 2025 年报及 2026 中期公告；深圳市国资委官网企业介绍（2026-08 更新）</p><h2>财务与杠杆</h2><table><thead><tr><th>口径</th><th>指标</th><th class='num'>2024</th><th class='num'>2025</th></tr></thead><tbody>
+<tr><td>深业集团（人民币，面板舆情）</td><td>营业收入（亿元）</td><td class='num'>171.24</td><td class='num'>前三季续亏</td></tr>
+<tr><td></td><td>归母净利润（亿元）</td><td class='num'>-5.94（首亏）</td><td class='num'>前三季 -8.48</td></tr>
+<tr><td>深圳控股（港元）</td><td>收益（亿港元）</td><td class='num'>155.67</td><td class='num'>403.64（+159.3%）</td></tr>
+<tr><td></td><td>股东应占损益（亿港元）</td><td class='num'>-18.23</td><td class='num'>-43.66（核心净利 +5）</td></tr>
+<tr><td></td><td>2026H1 预告（亿港元）</td><td class='num'>—</td><td class='num'>预亏 19-21（收窄）</td></tr>
+</tbody></table><ul>
+<li><span class='ev-neg'>利润表深度出清是最大信用减分项</span>：集团连续两年亏损（2024 首亏 -5.94 亿→2025 前三季 -8.48 亿），上市平台 2025 年亏 43.66 亿港元（减值+联营拖累、核心净利仍 +5 亿）——账面亏损主要是资产价格重估的非现金科目，经营性核心业务尚在盈亏线以上，但权益持续消耗影响杠杆与再融资定价。集团总资产/有息债务/净负债率等完整口径数据<b>暂未获取</b>（非上市主体，2025 年度跟踪评级报告未检索到）。</li>
+<li><b>资产端的隐性支撑</b>：深业集团为中国平安前十大股东（持股约 1.42%，国有法人股），该部分股权市值规模大、流动性好，是潜在的偿债备用资源（规模以定期披露为准，此处不估算）；深圳区域土储/城市更新项目变现能力在全国范围内属第一梯队。</li>
+</ul><h2>债务与再融资</h2><ul>
+<li><b>存续结构健康</b>：13 只存续券中 11 只公募（MTN+公募公司债）、仅 26深业01 私募；曲线短端 1.55%-1.60%（0.35-0.72y）、中段 1.67%-1.78%（1.6-2.4y），与 AAA 深圳国企（地铁/投控系）短端基本同价——<b>市场对其短久期信用高度认可</b>。</li>
+<li><span class='ev-neg'>但 3 年以上段正在被重新定价</span>：3.98y 估值 2.02% 且成交 +16.6bp 至 2.19%，与 3.02y（1.81%）拉开 21bp 期限利差+16.6bp 成交偏离——在无新增舆情背景下，更可能是机构对「亏损延续+评级过期」组合的久期规避（拉长久期名单剔除），而非违约担忧。</li>
+<li><b>到期分布友好</b>：due90=0；2027 年 3 月首波到期（24深业01+MTN001+MTN002，约 0.35-0.37y），近一年内到期约 3-4 笔——短端再融资利率 1.55% 附近，滚续压力小。境外债：深圳控股存在港元/美元负债（具体存量暂未获取），2026-07 有市场文章讨论其境外再融资压力（「完美风暴」观点，属市场评论，未获官方数据佐证，列示供跟踪）。</li>
+</ul><h2>股东支持</h2><ul>
+<li><b>深圳市国资委 100% 直管</b>，与深圳地铁、投控、深国际并列市属一级集团；历史上承担深圳保障房建设（深业鹏基等）、城市更新等政策性任务，2025-12 参与万科中山湾项目处置体现「区域稳定器」角色。</li>
+<li>深圳国资委体系支持能力极强（深圳一般预算收入 3,500 亿+ 量级、市属国企净资产万亿级），对旗下地产平台的定位是「自主经营+危时协调」——公开违约风险极低，但股东支持不改变亏损出清的报表节奏。</li>
+</ul><h2>信用资质研判与关键事项</h2><div class='verdict warn'><b>综合判断：关注（警惕信号积累中）。</b>支撑：深圳市国资委全资直管、公募为主的债券结构、短端融资与 AAA 同价、非开发业务现金流缓冲、平安股权等隐性资产。压力：连续两年亏损且 2026H1 续亏（收窄）、深圳控股 43.66 亿港元大额减值、<b>主体评级有效期 2026-08-14 已过且 2026 跟踪报告未检索到</b>、3 年以上段债券估值与成交同步上行（+16.6bp/D1+4.9bp）。评级过期+亏损+长久期重定价三因素叠加，触发「需人工关注」。</div><h3>影响盈利与偿债能力</h3><ul>
+<li>存货/资产减值持续计提：深圳控股 2025 年减值主导亏损 43.66 亿港元，若 2026 年深圳房价企稳（70 城一线环比续涨），减值高峰或已过 → <b>程度：中（边际趋缓）</b>。</li>
+<li>结转毛利率下行+结转规模回落：2026-2027 年收入将从 342 亿港元结转高峰回落 → 盈利修复依赖核心净利（+5 亿港元级）→ <b>程度：中</b>。</li>
+</ul><h3>影响现金流</h3><ul>
+<li>销售回款收缩至百亿级：开发业务现金流贡献下降，依赖园区/物业/资管等经常性现金流与再融资 → <b>程度：中</b>。</li>
+<li>到期结构：2027 年 3 月起约 3 笔短债到期，短端发行利率 1.55% 附近，接续无虞 → <b>程度：轻</b>。</li>
+<li>境外融资（深圳控股）：港元/美元存量负债再融资成本与渠道（具体规模暂未获取）→ <b>程度：轻-中（需数据确认）</b>。</li>
+</ul><h3>影响信用资质其他事项</h3><ul>
+<li><span class='ev-neg'>评级有效期已过（2026-08-14）且 2026 年度跟踪报告未检索到</span>：子公司深业基建控股 2026-07-24 已出跟踪报告，集团本部报告缺位可能是披露节奏问题，但需人工确认是否延迟披露或评级调整中 → <b>程度：中（信息风险）</b>。</li>
+<li>3y+ 债券趋势性重定价：若 25深业MTN003 后续成交持续 &gt;2.1% 或 24深业05（3.02y）估值突破 1.9%，确认机构集中减持 → <b>程度：中（当前早期）</b>。</li>
+<li>管理层换届后战略执行（王昱文 2025-05 接任）：转型「资管运营」方向与亏损收窄初步兑现 → <b>程度：轻</b>。</li>
+</ul><h2>结论与后续跟踪</h2><div class='verdict warn'><b>结论：关注 · 需人工关注（评级过期确认）。</b>违约风险极低（深圳国资+到期结构友好），但报表出清未完、长久期估值正在走弱，本批 8 家中唯一触发人工确认事项的主体。</div><ul>
+<li><b>前值→本次边际</b>：首建报告（无前值）。锚定边际：①集团归母净利 2024 -5.94 亿 → 2025 前三季 -8.48 亿（亏损扩大）；②深圳控股 2025 -43.66 亿港元（前值 -18.23 亿）但核心净利 +5 亿、2026H1 预亏收窄至 19-21 亿；③25深业MTN003 估值 D1 +4.9bp/D5 +2.4bp、成交 +16.6bp（曲线 3y+ 段重定价）；④评级有效期 2026-08-14 已过。</li>
+<li><b>跟踪点（可验证）</b>：①<b>集团本部 2026 年度跟踪评级报告是否发布（评级机构/展望有无调整）——最高优先级</b>；②25深业MTN003/24深业05 后续成交与估值：连续 2 笔 &gt;2.1% 或 D5 再 +5bp 触发复核；③深圳控股 2026 全年（2027-03 披露）亏损是否如预告收窄至 40 亿港元以内、减值是否停计；④2027 年 3 月 24深业01/MTN001/MTN002 到期兑付与续发利率（&gt;2.0% 则压力信号）；⑤深圳月度新房成交/价格（70 城一线指数）；⑥万科中山湾项目交易落地进度。</li>
+<li><b>估值观点</b>：短端（0.3-0.7y）1.55%-1.60% 与深圳 AAA 国企同价，安全；中段 2 年内 1.67%-1.78% 尚可参与；<b>3 年以上（1.81%-2.02%）在亏损出清+评级过期的组合下补偿不足，建议规避或减仓，等待评级确认与减值出清两大信号落地后再评估</b>；26深业01（私募 2.69y、1.86%）流动性差，仅建议持有盘自然到期。</li>
+</ul><p class='note'>完整稿由报告管线于 2026-11-08 生成（LLM 辅助，替换 2026-11-07 框架稿）。财务来源：面板 news_history（集团 2024 年报/2025 三季报/换帅）、深圳控股 2025 年度业绩与 2026 中期预告（港交所公告，Yahoo/futu/AAstocks 报道交叉核对）、深圳市国资委官网；集团完整财务口径与 2026 跟踪评级报告暂未检索到（如实标注）；行业定档引自本库《2026-10_房地产行业跟踪》；估值/成交来自面板（财汇，2026-11-06 收盘，未改动）。文件：信评报告模板/scaffold_out/shen_ye_ji_tuan.html → 面板 credit_reports/shen_ye_ji_tuan.html。</p></div></body></html>
