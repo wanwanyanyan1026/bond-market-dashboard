@@ -10,7 +10,7 @@ body { font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", san
 .rep-head .type { font-size: 12px; letter-spacing: 4px; color: #52514e; }
 .rep-head h1 { font-size: 24px; margin: 4px 0 2px; }
 .rep-head .meta { font-size: 12px; color: #6b6a66; }
-.badge { display: inline-block; background: #b35900; color: #fff; font-size: 12px;
+.badge { display: inline-block; background: #1e7b34; color: #fff; font-size: 12px;
   padding: 1px 10px; border-radius: 3px; letter-spacing: 2px; vertical-align: 3px; margin-left: 8px; }
 h2 { font-size: 17px; border-left: 4px solid #2a78d6; padding-left: 10px; margin: 26px 0 10px; }
 h3 { font-size: 14px; margin: 14px 0 6px; color: #33322f; }
@@ -18,76 +18,89 @@ table { border-collapse: collapse; width: 100%; font-size: 12.5px; margin: 8px 0
 th, td { border: 1px solid #ddd9d2; padding: 4px 8px; text-align: left; }
 th { background: #f4f2ee; font-weight: 600; }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-.todo { background: #fdf6e3; border: 1px dashed #d9b96a; padding: 8px 12px; margin: 6px 0;
-  color: #7a5b12; font-size: 13px; }
-.todo::before { content: "【待补】"; font-weight: 700; }
 .sig { display: inline-block; border-radius: 3px; padding: 1px 9px; font-size: 12px; margin: 0 6px 6px 0; }
 .sig-neg { background: #fdecec; color: #b3261e; border: 1px solid #f3c1bd; }
 .sig-pos { background: #e9f6ec; color: #1e7b34; border: 1px solid #bfe3c8; }
 .sig-neu { background: #f0f0ee; color: #55534e; border: 1px solid #d9d6cf; }
 .hist { color: #6b6a66; }
 .note { font-size: 12px; color: #8a8884; margin-top: 4px; }
-.verdict { background: #f4f8fd; border: 1px solid #c5d9ef; padding: 10px 14px; margin: 10px 0; }
-.verdict b.tag { font-size: 15px; }
+.src { font-size: 12px; color: #8a8884; }
+.verdict { background: #fdecec; border: 1px solid #f3c1bd; padding: 10px 14px; margin: 8px 0; }
+.verdict b { color: #b3261e; }
+.verdict-ok { background: #e9f6ec; border: 1px solid #bfe3c8; padding: 10px 14px; margin: 8px 0; }
+.ev { border-left: 3px solid #d9b96a; background: #fdf9ee; padding: 8px 12px; margin: 6px 0; }
 </style></head><body><div class="page">
-<div class='rep-head'><div class='type'>信用主体信评报告 · 完整稿 · LLM 辅助</div><h1>扬州盛裕投资发展有限公司<span class='badge'>完整稿 · 2026-11-08</span></h1><div class='meta'>城投（类城投I·基建/保障房/土地开发整理） · 江苏省扬州市·扬州高新技术产业开发区（国家级园区） ｜ 数据截至 2026-11-06 收盘（财汇 中债估值/成交）｜ 生成 2026-11-08 ｜ 触发原因：异常高估值成交（26盛裕投资MTN001 4.82y 偏离 +5.6bp）</div></div>
-<h2>信号快照（自动）</h2><p><span class='sig sig-neg'>异常高估值成交 · 26盛裕投资MTN001 偏离 +5.6bp</span></p><p class='note'>口径：高收益=存续券行权剩余期限≤3y 且行权中债估值&gt;阈值；偏离=活跃券成交收益率−中债估值（二永/永续按到期口径、其余行权口径）；异常高估值阈值 2.0bp。本次触发为<b>单笔长端成交的轻度高估值</b>：26盛裕投资MTN001（4.82y 公募中票）成交 1.21 亿、收益率 1.93% 对估值 1.87%，高 5.6bp——5 年期园区平台券流动性天然偏弱，单笔 1 亿级卖盘即可打出 5bp 印记，属<b>流动性/调仓性质而非信用重定价</b>。旁证：该券估值 D5 −1.8／D20 −4.1bp（近一月曲线仍在下行通道），无连续高估值成交，公司无任何负面舆情；同期限 26盛裕投资PPN001/002（4.93y 私募）估值 1.95%，公募/私募价差 8bp 结构正常。另据面板 due90 口径，3 个月内到期 10.0 亿/2 只（23盛裕投资MTN002 0.1y＋24盛裕投资MTN001 0.16y），其中 MTN002 已于 2026-11-03 刊发利率调整与回售行权公告——回售结果与续发安排是最近观察点。</p>
-<h2>存续券概览（自动 · 2026-11-06）</h2><table><thead><tr><th>债券简称</th><th>品种</th><th>发行方式</th><th class='num'>行权剩余期限(y)</th><th class='num'>行权估值(%)</th><th class='num'>成交收益率(%)</th><th class='num'>偏离(bp)</th><th class='num'>成交额(亿)</th></tr></thead><tbody><tr><td>26盛裕投资MTN001</td><td>中票</td><td>公募</td><td class='num'>4.82</td><td class='num'>1.87</td><td class='num'>1.93</td><td class='num'>+5.6 ⚠</td><td class='num'>1.21</td></tr><tr><td>23盛裕投资MTN002</td><td>中票</td><td>公募</td><td class='num'>0.1</td><td class='num'>1.58</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>24盛裕投资MTN001</td><td>中票</td><td>公募</td><td class='num'>0.16</td><td class='num'>1.61</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>24盛裕投资PPN003</td><td>PPN(私募)</td><td>私募</td><td class='num'>0.73</td><td class='num'>1.6</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>25盛裕投资MTN001</td><td>中票</td><td>公募</td><td class='num'>1.29</td><td class='num'>1.66</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>25盛裕投资MTN002</td><td>中票</td><td>公募</td><td class='num'>1.38</td><td class='num'>1.67</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>25盛裕投资MTN003</td><td>中票</td><td>公募</td><td class='num'>1.38</td><td class='num'>1.67</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>24盛裕投资PPN002</td><td>PPN(私募)</td><td>私募</td><td class='num'>2.73</td><td class='num'>1.8</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>26盛裕投资PPN001</td><td>PPN(私募)</td><td>私募</td><td class='num'>4.93</td><td class='num'>1.95</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>26盛裕投资PPN002</td><td>PPN(私募)</td><td>私募</td><td class='num'>4.93</td><td class='num'>1.95</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr></tbody></table><p class='note'>存续 10 只、2026-06-30 境内存量公募 25.2 亿＋私募 11.5 亿＝<b>36.7 亿</b>（yujiantouzi 宝典口径）。曲线：<b>0~0.8y 1.58%~1.61%，1.3~1.4y 1.66%~1.67%，2.7y 1.80%，4.8~4.9y 1.87%~1.95%</b>——公募/私募同期限价差约 8bp，曲线形态平滑；2026 年新发两只 5y PPN（26盛裕PPN001/002）将存量久期整体拉长，短端（≤0.16y）10 亿由回售/到期自然消化。AA/江苏园区平台的定价水平，在苏中区县/园区序列中处于中等偏紧位置。</p>
+<div class='rep-head'><div class='type'>信用主体信评报告 · 完整稿 · LLM 辅助</div><h1>扬州盛裕投资发展有限公司<span class='badge'>完整稿 · 2026-11-11</span></h1><div class='meta'>城投 · 江苏（扬州·扬州高新技术产业开发区，国家级园区，类城投I：基建/安置房/棚改/土地开发整理） ｜ 数据截至 2026-11-10 收盘（财汇 中债估值/成交）｜ 生成 2026-11-11 ｜ 触发原因：高收益（24盛裕投资PPN002 2.72y 行权估值 1.80%，触及 1.8% 阈值）</div></div>
+<h2>信号快照（自动）</h2>
+<p><span class='sig sig-neg'>高收益预警 · 24盛裕投资PPN002 2.72y 行权估值 1.80%（阈值 1.8%，贴线）</span><span class='sig sig-neu'>6M集中兑付 · 到期+回售10.0亿（占存续28%，未达预警线）</span><span class='sig sig-neu'>估值D1 +0.8bp（平稳）</span><span class='sig sig-pos'>无异常成交偏离</span></p>
+<p class='note'>口径：高收益=存续券行权剩余期限≤3y 且行权中债估值&gt;1.8%；偏离=活跃券成交收益率−中债估值（二永/永续按到期口径、其余行权口径）；异常高估值阈值 2.0bp；due180=6个月内行权到期+回售余额合计（行权口径含回售）。</p>
+<h2>存续券概览（自动 · 2026-11-10）</h2>
+<table><thead><tr><th>债券简称</th><th>品种</th><th>发行方式</th><th class='num'>行权剩余期限(y)</th><th class='num'>行权估值(%)</th><th class='num'>成交收益率(%)</th><th class='num'>偏离(bp)</th><th class='num'>成交额(亿)</th></tr></thead><tbody><tr><td>23盛裕投资MTN002</td><td>中票</td><td>公募</td><td class='num'>0.09</td><td class='num'>1.56</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>24盛裕投资MTN001</td><td>中票</td><td>公募</td><td class='num'>0.15</td><td class='num'>1.58</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>24盛裕投资PPN003</td><td>PPN(私募)</td><td>私募</td><td class='num'>0.72</td><td class='num'>1.6</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>25盛裕投资MTN001</td><td>中票</td><td>公募</td><td class='num'>1.28</td><td class='num'>1.67</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>25盛裕投资MTN002</td><td>中票</td><td>公募</td><td class='num'>1.37</td><td class='num'>1.68</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>25盛裕投资MTN003</td><td>中票</td><td>公募</td><td class='num'>1.37</td><td class='num'>1.68</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>24盛裕投资PPN002</td><td>PPN(私募)</td><td>私募</td><td class='num'>2.72</td><td class='num'>1.8</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>26盛裕投资MTN001</td><td>中票</td><td>公募</td><td class='num'>4.81</td><td class='num'>1.88</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>26盛裕投资PPN001</td><td>PPN(私募)</td><td>私募</td><td class='num'>4.92</td><td class='num'>1.99</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr><tr><td>26盛裕投资PPN002</td><td>PPN(私募)</td><td>私募</td><td class='num'>4.92</td><td class='num'>1.99</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td></tr></tbody></table><p class='note'>存续 10 只（公募中票 6 只＋私募 PPN 4 只）；1y 内 3 只，6M 内到期+回售 10.0 亿、占存续 28%。2026 年新发 3 只且期限拉长至 4.8~4.9y（26盛裕投资MTN001 1.88%、PPN001/002 1.99%）——长端发行成功落地，期限结构主动拉长。存量规模口径：境内公募 25.2 亿＋私募 11.5 亿＝36.7 亿（城投宝典，截至 2026-06-30）。私募 PPN 较同期限公募 MTN 高约 11bp（1.99% vs 1.88%），流动性/投资者结构溢价明确。</p>
 <h2>舆情与边际变化</h2>
-<h3>近 3 年舆情/公告历史（灰色可回溯）</h3><table><thead><tr><th>日期</th><th>方向</th><th>严重度</th><th>事件</th><th>来源</th></tr></thead><tbody>
-<tr class='hist'><td>2024-05-22</td><td>中性</td><td>低</td><td>划出所持扬州景兴建设股权（区属国资体系内股权调整）</td><td>news_history.json（面板扫描）</td></tr>
+<h3>近 3 年舆情/公告历史（灰色可回溯）</h3>
+<table><thead><tr><th>日期</th><th>方向</th><th>严重度</th><th>事件</th><th>来源</th></tr></thead><tbody><tr class='hist'><td>2024-05-22</td><td>中性</td><td>低</td><td>公告将持有的扬州景兴建设工程有限公司股权无偿划出（来源 公司公告 2024-05-22，转引自中证鹏元2025年跟踪评级报告）；后续债券付息正常、2025年1月获交易商协会中票注册</td><td>ann</td></tr></tbody></table>
+<div class='ev'><b>2026-11-11（建稿日）当日扫描：</b>无新增主体级舆情/公告（news_data.json，asOf 2026-11-11）；近 3 年留存舆情仅 1 条（子公司股权划出，中性/低）。未检索到票据逾期、非标违约、被执行、欠税等负面公开记录（检索日 2026-11-11）。</div>
+<div class='ev'><b>股权沿革（背景）：</b>公司成立于 2004 年，原由扬州高新区管委会持股；2023 年经扬州市政府批复，100% 股权无偿划转至<b>扬州高发产业投资发展集团有限公司</b>（注册资本 60 亿、扬州市核心基础设施建设主体），实际控制人仍为扬州市人民政府（授权扬州高新区管委会履行出资人职责）（来源：百度百科工商沿革、中证鹏元 2025-07 跟踪评级报告、苏银理财/上海农商银行投前文件）。</div>
+<h2>区域经济与区域财政实力（扬州市·邗江区/扬州高新区）</h2>
+<table><thead><tr><th>指标（邗江区）</th><th class='num'>2023</th><th class='num'>2024</th><th class='num'>2025</th></tr></thead><tbody>
+<tr><td>GDP（亿元）</td><td class='num'>1313.1</td><td class='num'>1385.0</td><td class='num'>1446.0</td></tr>
+<tr><td>GDP 增速</td><td class='num'>6.3%</td><td class='num'>6.0%</td><td class='num'>6.0%</td></tr>
+<tr><td>一般公共预算收入（亿元）</td><td class='num'>50.6</td><td class='num'>52.7</td><td class='num'>55.8</td></tr>
+<tr><td>财政自给率</td><td class='num'>63.2%</td><td class='num'>70.0%</td><td class='num'>74.4%</td></tr>
+<tr><td>政府性基金收入（亿元）</td><td class='num'>53.4</td><td class='num'>54.5</td><td class='num'>45.9</td></tr>
+<tr><td>地方政府债务余额（亿元）</td><td class='num'>132.2</td><td class='num'>145.5</td><td class='num'>172.4</td></tr>
+<tr><td>发债城投有息债务（亿元）</td><td class='num'>378.6</td><td class='num'>380.7</td><td class='num'>409.6</td></tr>
+<tr><td>城投债务率（有息/一般预算）</td><td class='num'>748%</td><td class='num'>722%</td><td class='num'>734%</td></tr>
 </tbody></table>
-<h3>近期公告与评级动态（2026-11-08 建稿检索）</h3>
-<table><thead><tr><th>日期</th><th>事件</th><th>影响方向/程度</th><th>来源</th></tr></thead><tbody>
-<tr><td>2026-11-03</td><td>「23盛裕投资MTN002」刊发 2026 年度发行人利率调整选择权及投资人回售选择权行使公告（该券 0.1y 到期，行权窗口临近）</td><td>中性——回售规模与票面调整结果待落地</td><td>中国货币网（chinamoney.com.cn，2026-11-03）</td></tr>
-<tr><td>2026-07-24</td><td>年度跟踪评级：主体 AA/稳定（评级库登记；鹏元承做序列）</td><td>正面——连续维持</td><td>gjdata 评级库（entity_ratings.json）</td></tr>
-<tr><td>2025-07</td><td>「扬州盛裕投资发展有限公司相关债券 2025 年跟踪评级报告」披露：控股股东为扬州智谷投资管理有限公司（扬州高发体系）</td><td>中性——股权链条披露清晰</td><td>鹏元资信（cspengyuan.com，2025-07）</td></tr>
-<tr><td>2023-08</td><td>据扬州市政府批复，控股股东由扬州高新区管委会（直接履职）变更为扬州高发产业投资发展集团有限公司</td><td>中性——国资体系整合，实控人不变</td><td>公开资料/评级报告（2023-08）</td></tr>
-</tbody></table>
-<h2>区域经济与财政（扬州市 · 地级市）</h2>
-<table><thead><tr><th>指标</th><th class='num'>2023</th><th class='num'>2024</th><th class='num'>2025</th><th>边际</th></tr></thead><tbody>
-<tr><td>GDP（亿元）</td><td class='num'>7423.3</td><td class='num'>7809.6</td><td class='num'>8056.8</td><td>增速 6.0%/6.0%/5.5%，稳步扩容</td></tr>
-<tr><td>一般公共预算收入（亿元）</td><td class='num'>347.6</td><td class='num'>361.2</td><td class='num'>376.3</td><td><b>连续正增长（+4%/+4%）</b></td></tr>
-<tr><td>财政自给率</td><td class='num'>48.9%</td><td class='num'>49.6%</td><td class='num'>52.4%</td><td><b>逐年改善</b></td></tr>
-<tr><td>政府性基金收入（亿元）</td><td class='num'>651.6</td><td class='num'>620.7</td><td class='num'>537.0</td><td>两年 −18%（土地市场退坡，全市基金收入体量仍可观）</td></tr>
-<tr><td>地方政府债务余额（亿元）</td><td class='num'>1216.8</td><td class='num'>1430.2</td><td class='num'>1751.7</td><td>两年 +44%（置换/专项扩容）</td></tr>
-<tr><td>发债城投有息债务（亿元）</td><td class='num'>4788.4</td><td class='num'>5194.6</td><td class='num'>5444.3</td><td>仍在净增（+7%/+5%）</td></tr>
-<tr><td>城投债务率（城投有息/一般预算）</td><td class='num'>13.8 倍</td><td class='num'>14.4 倍</td><td class='num'>14.5 倍</td><td>江苏地级市常见高位（分母仅预算收入），综合财力口径明显更低</td></tr>
-</tbody></table><p class='note'>来源：yujiantouzi 区域经济数据库（2026-11-08 查询）。扬州为苏中经济强市：GDP 超 8000 亿、预算收入连续增长、自给率升至 52%——区域基本面在江苏 13 市中处于中游偏上，显著好于苏北、弱于苏南。压力点在<b>政府性基金收入两年下滑 115 亿</b>（土地财政退坡）与城投有息持续净增，扬州城投体系体量（5444 亿）相对财力偏大，是江苏省化债（融资平台退出/整合）的重点推进区域之一。公司所处<b>扬州高新技术产业开发区为国家级园区</b>（位于邗江区），园区级财政数据未在库中单列（以园区决算披露为准）。</p>
-<h2>股权结构与平台地位</h2>
-<p>公司成立于 2004 年 1 月（曾用名：扬州市邗江兴诚投资建设有限公司），法定代表人高军。<b>股权层级：扬州高新技术产业开发区管委会（实控）→ 扬州高发产业投资发展集团有限公司（2023-08 起为控股股东）→ 扬州智谷投资管理有限公司（2025 鹏元跟踪报告列示的直接控股股东，系 2023-06 智谷投资 49% 股权划入扬州高发形成）→ 公司</b>。职能定位：高新区范围内<b>市政基建、安置房/保障房建设、土地开发整理</b>主平台（类城投I），城市基础设施相关收入占比 95%+。体量为小而精型：总资产 272 亿、存量债 36.7 亿，在扬州平台序列中属园区层级中坚——扬州市级有扬州城建（AAA）、扬州交通等，邗江区有邗江城建（公司曾现金增资 5 亿并参股）等，公司是<b>高新区板块的主要发债主体</b>。主体评级 AA/稳定（鹏元序列；评级库 2026-07-24 登记维持）。</p>
+<p class='src'>来源：yujiantouzi 区域经济数据库 2026-11-11 调取（邗江区口径；扬州高新区注册于邗江区，为国家级高新区，园区层面财政单列数据暂未获取）。</p>
+<p>扬州高新区（国家级）位于邗江区，区域以装备制造、汽车及零部件、生物健康产业为主。邗江区 GDP 1446 亿、增速 6%，一般预算收入 55.8 亿三年连增、财政自给率升至 74.4%——经济财政属江苏中上游区县（弱于苏南强区、强于苏中一般区县）。边际方向：政府性基金收入 54.5→45.9 亿（-16%）温和收缩；地方政府债务余额两年+30%；发债城投有息 409.6 亿、城投债务率 734%（三年基本走平）。扬州市级统筹（市政府直为实控人）+江苏省级金融资源构成再融资后盾，区域无尾部舆情记录。</p>
+<h2>股权层级与平台地位</h2>
+<p>股权层级为「扬州市人民政府（实控）—扬州高发产业投资发展集团（100%）—公司」，扬州高发为扬州市核心基建主体（注册资本 60 亿），公司为其下属的<b>扬州高新区主要基础设施建设主体</b>（扬州新材料投资集团 2023 年中票文件口径），承担高新区范围内基建、安置房/棚改与土地开发整理职能，城投类收入占比 97.4%（2024）——业务纯度高、平台属性纯粹。2023 年划入扬州高发体系后，公司由园区直管升格为市级核心集团成员，市级统筹与增信半径缩短。</p>
 <h2>债务结构与偿债能力</h2>
-<table><thead><tr><th>指标</th><th class='num'>2021</th><th class='num'>2022</th><th class='num'>2023</th><th class='num'>2024</th><th class='num'>2025</th><th>边际</th></tr></thead><tbody>
-<tr><td>总资产（亿元）</td><td class='num'>203.8</td><td class='num'>234.4</td><td class='num'>250.2</td><td class='num'>246.6</td><td class='num'>272.0</td><td>稳步扩表</td></tr>
-<tr><td>资产负债率</td><td class='num'>49.6%</td><td class='num'>41.5%</td><td class='num'>42.7%</td><td class='num'>42.3%</td><td class='num'>44.4%</td><td><b>40% 出头——城投中极低</b></td></tr>
-<tr><td>有息债务（亿元）</td><td class='num'>69.1</td><td class='num'>73.4</td><td class='num'>81.3</td><td class='num'>76.8</td><td class='num'>暂未获取</td><td>2024 净压降 4.5 亿</td></tr>
-<tr><td>债券融资（亿元 / 占有息）</td><td class='num'>33.9 / 49.0%</td><td class='num'>35.6 / 48.5%</td><td class='num'>41.6 / 51.2%</td><td class='num'>36.9 / 48.1%</td><td class='num'>36.7（境内存量 2026-06）/ 42.3%（占比口径）</td><td>约五成、存量稳定</td></tr>
-<tr><td>银行贷款（亿元）</td><td class='num'>34.7</td><td class='num'>37.8</td><td class='num'>39.6</td><td class='num'>39.9</td><td class='num'>暂未获取</td><td>约五成、平稳</td></tr>
-<tr><td>非标占比</td><td class='num'>0.7%</td><td class='num'>0.0%</td><td class='num'>0%</td><td class='num'>0%</td><td class='num'>0.0%</td><td><b>连续多年零非标——结构最优</b></td></tr>
-<tr><td>短期债务占比</td><td class='num'>22.7%</td><td class='num'>24.1%</td><td class='num'>29.6%</td><td class='num'>23.6%</td><td class='num'>20.6%</td><td><b>回落至两成——短期化压力缓解</b></td></tr>
-<tr><td>受限资产/净资产</td><td class='num'>9.1%</td><td class='num'>9.5%</td><td class='num'>10.5%</td><td class='num'>5.7%</td><td class='num'>8.8%</td><td>低水平</td></tr>
-</tbody></table><p class='note'>来源：yujiantouzi 城投宝典（2021-2025）。营收 8.7 亿／净利 2.7 亿／ROE 1.9%（2025）——体量小、政府往来款回款与补助对利润贡献大（净利率 31% 主要来自非经营性损益与补贴，以年报为准）；政府应收占应收账款比重 2023 年 19.3%→2024 年 29.9%（占比抬升，回款节奏放慢迹象）。历史对外担保：2021 年 19.6 亿/2022 年 32.7 亿（均为国企），2023 年后宝典未披露——占净资产约 15%~22%，规模可控。</p>
-<p><b>信号归因（2026-11-08 建稿）</b>：① <b>异常高估值成交 +5.6bp</b>——26盛裕投资MTN001（4.82y）单笔 1.21 亿成交于 1.93%，对估值 1.87% 高 5.6bp。该券为 5y 长端、天然流动性折价区间，叠加 2026 年新发 5y PPN 后同主体长端供给增加，单笔卖盘打出浅溢价属<b>交易性现象</b>；无连续高估值成交、无舆情配合、D20 −4.1bp 显示曲线整体仍在走强，<b>不构成信用恶化信号</b>，但需观察是否发展为连续性卖压。② <b>due90 10.0 亿/2 只</b>（23盛裕MTN002 0.1y＋24盛裕MTN001 0.16y）占存量债 27%——MTN002 已公告利率调整+回售行权（2026-11-03），回售规模与票面调整幅度是公司再融资的一手观察点；以公司 2026 年 PPN 两只新发（5y）的通道状态看，滚续无障碍。③ 估值面 D5 −1.8/D20 −4.1bp 稳定向好。</p>
-<h2>资产与现金流质量</h2>
-<p>资产以<b>基建/安置房项目成本（存货）、土地开发整理投入及政府往来应收</b>为主；总资产 272 亿对应有息仅 77 亿左右，权益厚度高（净资产约 151 亿）——资产负债表在城投中属于「轻债重权益」的罕见结构。应收端政府类占比约三成（2024），较 2023 年抬升，反映回款周期拉长（土地/园区结算节奏）；受限资产/净资产 8.8%，抵押包袱轻。经营现金流以园区结算回款与政府补助为主，利润表 2.7 亿净利对 36.7 亿存量债年利息（约 0.6~0.7 亿）覆盖充足；现金流明细以年报为准（暂未获取最新现金流量表）。</p>
-<h2>区域金融资源与兄弟国企可协调资源</h2>
-<p><b>区域金融资源</b>：扬州本地法人金融（江苏银行扬州分行、扬州农商行、昆山农商行扬州机构等）+ 苏南/全国性银行苏中分支密集，江苏省内银行对园区平台授信普遍充裕；公司银行贷款约 40 亿、零非标，融资渠道以银行+公募债为主，结构健康。<b>兄弟国企</b>：扬州高发产业投资发展集团（控股股东体系，高新区国资运营主体）；市级平台扬州城建国资控股（AAA）、扬州交通产业集团等；隔壁扬州经开区有扬州经开集团（惠誉 2026-02 首予 BBB-/稳定）——扬州各园区/区县平台分工清晰、历史上无负面事件。江苏省 2024-2026 年融资平台数量压降与整合（「一园区一主体」方向）背景下，公司作为高新区主平台的整合主导方（曾增资参股邗江城建）而非被整合边缘方的概率更高。市政府对园区平台的历史支持以资产注入/划转（2024-05 划出景兴建设股权即体系内调整）与结算回款安排为主（明细以跟踪评级为准）。</p>
-<h2>外部支持与增信</h2>
-<p>扬州高新区基建/安置房/土储职能的唯一发债主平台，园区管委会/扬州高发体系的项目与资产注入即制度性支持；历史注资补贴明细暂未获取（以鹏元跟踪评级报告为准）。主体评级 AA/稳定（2026-07-24 评级库登记维持；鹏元序列 2025-07 报告可查）。存续券无外部专业担保增信。</p>
-<h2>信用资质研判与关键事项</h2>
-<div class='verdict'><b class='tag'>综合研判：<b style="color:#1e7b34">稳健（优质地市国家级园区平台·低杠杆零非标小体量）</b></b>　——　扬州市基本面稳步向好（GDP 8057 亿、预算收入连增、自给率 52%）＋国家级高新区主平台＋负债率 44%/零非标/短债两成/受限 9% 的干净报表＋AA/稳定连续维持＋2026 年 5y PPN 通道畅通；本次异常偏离为长端单笔交易性印记，无信用事件成分。压制项：体量小（存量债 36.7 亿）抗单一事件冲击能力弱、政府应收占比抬升、扬州市城投总量偏大与土地基金退坡的宏观背景。</div>
-<p><b>支撑（偏稳因素）</b>：① 苏中强市+国家级园区区域禀赋；② 资产负债率 44.4%、非标 0%、短债 20.6%——结构指标全口径优于绝大多数同评级城投；③ 权益厚（净资产约 151 亿对存量债 36.7 亿，覆盖率 4 倍+）；④ AA/稳定连续维持（2026-07-24）；⑤ 近 3 年仅 1 条中性股权划转记录、零负面舆情；⑥ 2026 年新发 5y PPN 两只，一级通道顺畅。</p>
-<p><b>关键事项（事件→影响路径→程度）</b>：</p>
-<table><thead><tr><th>事项</th><th>事件→影响路径→程度</th></tr></thead><tbody>
-<tr><td>26盛裕投资MTN001 高估值成交 +5.6bp（本次触发）</td><td>5y 长端流动性弱+新发 PPN 供给增加→单笔卖盘打出浅溢价→若发展为连续多日高估值成交则升级为机构减仓信号→<b>程度：低（交易性）</b>，跟踪后续成交</td></tr>
-<tr><td>due90 10.0 亿/2 只＋MTN002 回售行权公告（2026-11-03）</td><td>回售规模→若大比例回售则 2 个月内集中兑付→以公司通道与银行备用授信看可承接→<b>程度：低中（节奏观察）</b>，回售结果公告为验证点</td></tr>
-<tr><td>政府应收占比 19.3%→29.9%（2023→2024）</td><td>园区结算/土地回款周期拉长→营运资金占用上升→权益厚、利息覆盖足，暂无压力→<b>程度：低</b></td></tr>
-<tr><td>扬州政府性基金收入两年 −18%</td><td>土地退坡→园区土储/开发业务回款与新增项目收缩→公司扩表放缓→<b>程度：低</b>（区域共性）</td></tr>
-<tr><td>历史对外担保 32.7 亿均国企（2022，未再披露）</td><td>或有负债占净资产约两成→被担保方均为区属国企→<b>程度：低</b>（年报核实最新余额）</td></tr>
+<table><thead><tr><th>指标</th><th class='num'>2021</th><th class='num'>2022</th><th class='num'>2023</th><th class='num'>2024</th><th class='num'>2025.6（宝典）</th></tr></thead><tbody>
+<tr><td>总资产（亿元）</td><td class='num'>203.8</td><td class='num'>234.4</td><td class='num'>250.2</td><td class='num'>246.6</td><td class='num'>272.0</td></tr>
+<tr><td>资产负债率</td><td class='num'>49.6%</td><td class='num'>41.5%</td><td class='num'>42.7%</td><td class='num'>42.3%</td><td class='num'>44.4%</td></tr>
+<tr><td>有息债务（亿元）</td><td class='num'>69.1</td><td class='num'>73.4</td><td class='num'>81.3</td><td class='num'>76.8</td><td class='num'>—</td></tr>
+<tr><td>其中：债券融资（亿元/占比）</td><td class='num'>33.9 / 49.0%</td><td class='num'>35.6 / 48.5%</td><td class='num'>41.6 / 51.2%</td><td class='num'>36.9 / 48.1%</td><td class='num'>债券占比 42.3%</td></tr>
+<tr><td>银行贷款（亿元）</td><td class='num'>34.7</td><td class='num'>37.8</td><td class='num'>39.6</td><td class='num'>39.9</td><td class='num'>—</td></tr>
+<tr><td>非标（亿元/占比）</td><td class='num'>0.5 / 0.7%</td><td class='num'>0 / 0%</td><td class='num'>0 / 0%</td><td class='num'>0 / 0%</td><td class='num'>占比 0.0%</td></tr>
+<tr><td>短期债务占比</td><td class='num'>22.7%</td><td class='num'>24.1%</td><td class='num'>29.6%</td><td class='num'>23.6%</td><td class='num'>20.6%</td></tr>
+<tr><td>政府类应收占总资产比</td><td class='num'>16.8%</td><td class='num'>13.7%</td><td class='num'>19.3%</td><td class='num'>29.9%</td><td class='num'>—</td></tr>
+<tr><td>受限资产/净资产</td><td class='num'>9.1%</td><td class='num'>9.5%</td><td class='num'>10.5%</td><td class='num'>5.7%</td><td class='num'>8.8%</td></tr>
+<tr><td>营业收入（亿元）</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>8.7</td></tr>
+<tr><td>净利润（亿元）</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>2.7</td></tr>
+<tr><td>ROE</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>1.9%</td></tr>
 </tbody></table>
+<p class='src'>来源：yujiantouzi 城投宝典 2021-2025 年度画像（2025 行截至 2026-06-30），2026-11-11 调取；城投评分 score 6（各年）。</p>
+<p>要点：①<b>杠杆为 208 池内最轻一档</b>：资产负债率 44.4%、有息债务 76.8 亿（2024 年净偿还 4.5 亿），对 272 亿总资产的债务强度低；②非标连续三年为零，债券/银行约 48%/52% 双轮结构均衡；③短债占比 20.6%、6M 兑付 10 亿占 28%，期限结构宽松；④受限资产/净资产仅 8.8%，再抵押空间充裕；⑤盈利在本批新建主体中相对最好（净利 2.7 亿/ROE 1.9%）；⑥政府类应收占比 29.9%（2024，较 2023 年 19.3% 上升——安置房/代建结算挂账增加，需跟踪但不极端）；⑦对外担保 32.7 亿（2022，均为国企，约占净资产 20%）——2023-2024 字段未更新，敞口待半年报核。</p>
+<h2>资产与现金流质量</h2>
+<p>资产以安置房/棚改建设成本、基建代建投入与土地开发整理成本为主，政府类应收 29.9%（2024）反映财政结算占用中等水平。公司业务纯度高（城投类收入 97.4%），收入与回款高度绑定高新区财政与扬州市统筹结算；邗江区/高新区财政自给率 74%+、一般预算连增，结算资金来源稳定性尚可。经营现金流明细暂未获取（宝典未披露），按 8.7 亿营收体量推断经营性造血有限，偿债秩序=银行续贷+公募中票滚续+财政结算的函数，且 76.8 亿的有息体量对上述任一渠道的依赖度都不高。</p>
+<h2>区域金融资源与可协调资源</h2>
+<p>扬州市金融资源属江苏中游：江苏银行扬州分行、南京银行及国有大行构成本地信贷主力，公司银行贷款 39.9 亿稳定续作；控股股东扬州高发（市级核心平台、注册资本 60 亿）的资金调剂与再融资协同是最直接的可协调资源。扬州市无债券违约/非标逾期区域舆情，市属平台群（扬州城建、扬州经开、扬州交通等）信用记录干净。2026 年公司成功发行 4.8~4.9y 长端中票与 PPN，显示市场对其市级集团成员身份的认可度尚可。</p>
+<h2>兄弟国企可协调资源</h2>
+<table><thead><tr><th>主体</th><th>职能</th><th>现状（2025~2026）</th></tr></thead><tbody>
+<tr><td>扬州高发产业投资发展集团有限公司（控股股东）</td><td>扬州市核心基础设施建设主体</td><td>2023 年起 100% 持有公司；市级统筹平台，资金调剂与担保协同半径最短（注册资本 60 亿）</td></tr>
+<tr><td>扬州市城建国有资产控股（集团）有限责任公司</td><td>市级综合城投</td><td>2026-04-30 正常披露 2025 年度合并报表相关公告（上交所），未见负面</td></tr>
+<tr><td>扬州经济技术开发区开发（集团）有限公司</td><td>经开区开发主体</td><td>2025 年正常披露董监事变更等公告（中国货币网），未见负面</td></tr>
+<tr><td>扬州新材料投资集团有限公司</td><td>新材料产业投资</td><td>2023 年中票正常发行存续（其文件确认公司为高新区主要基建主体）</td></tr>
+</tbody></table>
+<p>扬州市平台群全部正常滚续、无出险个体；公司虽为 AA 主体，但背靠市级核心集团（扬州高发），可协调资源评估为<b>中等偏强</b>。</p>
+<h2>外部支持与增信</h2>
+<p>主体评级 AA/稳定（中证鹏元 2025-07-24 年度跟踪维持，entity_ratings 与评级报告原文一致，cspengyuan.com 已核）。政府支持历史形态：高新区财政结算回款、市级划转资产与资本金（明细暂未获取）；2025-01 获交易商协会中票注册（额度端支持）。无专业担保公司增信新发记录；对外担保 32.7 亿（2022，均为国企）为或有负债，最新敞口待核。</p>
+<h2>信用资质研判与关键事项</h2>
+<div class='verdict-ok'>综合研判：<b>关注（偏稳健）</b>。支撑项：资产负债率 44.4%、有息 76.8 亿且 2024 年净偿还的轻杠杆；非标零、受限资产 8.8%、短债 20.6% 的干净结构；市级核心集团（扬州高发）成员的平台地位；2026 年长端（4.8~4.9y）新发落地；舆情面零负面、AA 评级刚于 2025-07 维持。关注项：AA 级别对应的外部融资半径有限；政府类应收占比升至 29.9%（结算挂账增加）；邗江区基金收入 -16% 与城投债务率 734% 的区域总量；对外担保敞口（2022 年 32.7 亿）未更新；盈利绝对规模小（净利 2.7 亿）。</div>
+<h3>影响盈利与偿债能力事项</h3>
+<div class='ev'>政府类应收占比 19.3%→29.9%（2023→2024）+ 邗江区政府性基金收入 54.5→45.9 亿（-16%）→ 安置房/代建结算回款周期拉长 → 经营现金流边际承压；程度：<b>中低</b>（应收绝对占比仍低于同类安置房平台，区财政自给率 74%+ 且连增）。</div>
+<div class='ev'>AA 级别+私募 PPN 占存量约 1/3 → 融资成本与渠道宽度弱于 AA+ 同类 → 市场分层期（私募/弱城投高估值成交集中）估值弹性更大；程度：<b>低中</b>（当前估值曲线平稳、2026 年长端发行成功）。</div>
+<h3>影响现金流事项</h3>
+<div class='ev'>6M 到期+回售 10.0 亿（占 28%）+ 1y 内 3 只券（0.09y/0.15y/0.72y）→ 短端集中度尚可但 0.09y/0.15y 两券临近期限切点；程度：<b>低</b>（有息仅 76.8 亿，滚续体量小，2025-2026 年中票/PPN 均正常发行）。</div>
+<div class='ev'>对外担保 32.7 亿（2022，均为国企，约占净资产 20%）→ 区域互保代偿或有负债；程度：<b>低</b>（未见代偿记录，2023-2024 敞口待核）。</div>
+<h3>影响信用资质其他事项</h3>
+<div class='ev'>邗江区城投有息 409.6 亿/债务率 734%（走平）→ 区域平台整合或推进，公司已划入市级集团体系，进一步整合影响中性偏正面；程度：<b>低</b>。</div>
+<div class='ev'>2024-05 子公司（扬州景兴建设）股权划出 → 资产与业务边界微调，评级机构未作负面解读；程度：<b>低</b>。</div>
 <h2>结论与后续跟踪</h2>
-<p><b>判断</b>：扬州高新区主平台（基建/安置房/土储），「稳健（优质地市国家级园区·低杠杆零非标小体量）」——报表结构与区域禀赋俱佳，长端流动性弱是定价特征而非资质缺陷。</p>
-<p><b>前值→本次边际</b>：舆情面前值无负面→本次仍无（近 3 年仅 1 条中性股权划转）；评级面前值 AA/稳定→本次维持（2026-07-24 评级库登记）；成交面前值无异常→本次 26盛裕投资MTN001 单笔 +5.6bp（长端交易性）；估值面 D20 −4.1bp→D5 −1.8bp 稳中走强；兑付面新增 due90 10.0 亿/2 只，其中 23盛裕MTN002 已进入利率调整+回售行权窗口（2026-11-03 公告）。</p>
-<p><b>可验证跟踪点</b>：① 23盛裕投资MTN002 回售结果公告（回售比例、调整后票面）与兑付落地（未来 6 周）；② 24盛裕投资MTN001（0.16y）到期兑付；③ 26盛裕投资MTN001 是否出现连续高估值成交（连续 2 日+偏离&gt;2bp 即升级关注）；④ 2026 年报：政府应收占比、对外担保余额、货币资金/短债；⑤ 扬州高发体系整合动作（公司角色：整合方 or 被整合方）；⑥ 扬州市 2026 年政府性基金收入是否止跌。</p>
-<p><b>估值观点</b>：短端（≤0.2y 1.58%~1.61%）carry 薄；1~1.5y（1.66%~1.67%）票息-久期平衡段可配；2.7y（1.80%）与 5y 公募（1.87%，本次成交位）对 AA 园区平台属合理偏紧定价，5y 私募（1.95%）流动性补偿足额、持有到期账户可参与。整体中性偏正面；触发位 1.93% 若再现且伴随曲线其他点位跟随上行，才需重估。</p>
-<p class='note'>完整稿由报告管线自动联动生成（2026-11-08）：信号快照与存续券表为面板自动数据（财汇 2026-11-06 估值日）；评级/公司信息引自评级库（gjdata）、鹏元 2025 年跟踪评级报告（cspengyuan.com）、中国货币网公告（2026-11-03）与公开资料；财务/区域数据来自 yujiantouzi 城投宝典（2021-2025）与区域经济数据库。未获取项已如实注明。人工复核后如有增量信息请直接更新本文件。</p></div></body></html>
+<p><b>判断：</b>关注（偏稳健）档。公司是「轻杠杆+干净结构+市级集团背书」的 AA 园区平台：个体资产负债表在 208 池内属健康一档，本次高收益触发（PPN 1.80% 贴线）更多是 AA 级私募品种的市场分层定价，而非信用基本面信号。</p>
+<p><b>前值→本次边际：</b>首次建稿（前值：无）。舆情面前值：2024-05 子公司股权划出（中性）；本次建稿触发=高收益口径首次命中（24盛裕投资PPN002 1.80%）。估值边际平稳（D1 +0.8bp），2026 年长端新发（1.88%~1.99%）显示一级市场通道良好。</p>
+<p><b>可验证跟踪点：</b>①0.09y 的 23盛裕投资MTN002、0.15y 的 24盛裕投资MTN001 兑付与续发；②半年报政府类应收占比（29.9% 是否见顶回落）与对外担保最新敞口；③扬州高发层面的整合/注资动作；④24盛裕投资PPN002（1.80%）估值走向——AA 私募贴阈值状态固化与否；⑤邗江区/高新区财政数据（基金收入企稳与否）。</p>
+<p><b>估值观点：</b>曲线 0.09y 1.56% → 2.72y 1.80% → 4.92y 1.99%，形态平滑且长端有溢价；AA 级+私募属性下与 AA+ 同类（如常州滨湖不含权 1.71%~1.75%）利差约 5~10bp，评级与流动性补偿基本合理。配置上 1~3y 中票（1.67%~1.80%）可作苏中园区平台持仓，4.9y PPN 1.99% 对 AA 主体而言久期补偿偏薄，需配合区域再融资环境评估；若一级发行利率显著低于同期限 PPN 二级估值，是集团协同增信强化的信号。</p>
+<p class='note'>完整稿由信评报告自动联动管线生成（2026-11-11，LLM 辅助）：面板数据取自 trades_data.json/bonds_dump.json（财汇，截至 2026-11-10），财务/区域/评级数据来源见各节标注（yujiantouzi 城投宝典/区域经济数据库、中证鹏元 2025-07 跟踪评级报告、百度百科/企查查工商沿革、上交所/中国货币网债券文件，检索日 2026-11-11）。发布路径 credit_reports/yang_zhou_sheng_yu_tou_zi_fa_zhan.html。</p></div></body></html>
