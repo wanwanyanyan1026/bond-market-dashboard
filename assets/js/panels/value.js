@@ -400,13 +400,13 @@ PANELS["value"] = {
     const mrHave = MR_KEYS.filter((k) => MR[k] && has(MR[k].values));
     const mrBox = h("div", {id: "value-manual-chart", class: "chart", style: {height: mrHave.length ? "" : "0"}});
     const manualCard = h("section", {class: "card", id: "value-manual-card"}, [
-      h("h3", {class: "card-title"}, ["银行负债端与政策利率（手录）"]),
-      App.badge("manual_inputs/series.json · 季度~年度低频", fetchedAt),
+      h("h3", {class: "card-title"}, ["银行负债端与政策利率（手录/自动）"]),
+      App.badge("series.json 手录 + 周六LLM联网补数 · 净息差华泰自动", fetchedAt),
       h("p", {class: "card-sub"}, [mrHave.length
         ? "已录入：" + mrHave.join("、") + " · 其余待录"
-        : "存款利率1Y（国有挂牌）/ MLF利率 / 商业银行净息差 待手录"
-          + "（manual_inputs/series.json，调价/季披露时点录入即可）"]),
-      mrHave.length ? mrBox : h("div", {class: "empty"}, ["待手录（manual_inputs/series.json）"]),
+        : "存款利率1Y（国有挂牌）/ MLF利率 / 商业银行净息差 待录"
+          + "（净息差=华泰上市银行口径自动；存款/MLF=周六 LLM 补数或 series.json 手录，同日手录优先）"]),
+      mrHave.length ? mrBox : h("div", {class: "empty"}, ["待录（series.json 手录 / 周六LLM补数）"]),
     ]);
 
     /* ⑩ 新老券利差（国债/国开 × 1/3/5/7/10/30Y 全档，品种 chips；30Y 档稀疏缺值如实） */
